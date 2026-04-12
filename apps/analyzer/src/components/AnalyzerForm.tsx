@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Search, MapPin } from "lucide-react";
+import { Search } from "lucide-react";
 import { Input } from "./ui/Input";
 import { Button } from "./ui/Button";
 import { useRouter } from "next/navigation";
@@ -28,7 +28,7 @@ export function AnalyzerForm() {
     >
       <Input
         type="text"
-        placeholder="Paste Zillow link or enter address..."
+        placeholder="Enter property address..."
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         icon={<Search className="w-5 h-5" />}

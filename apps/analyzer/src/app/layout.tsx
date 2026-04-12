@@ -2,21 +2,26 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { MapProvider } from "@/components/maps/MapProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import dynamic from "next/dynamic";
 import "./globals.css";
 
-const inter = Inter({ 
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-inter", 
+  variable: "--font-inter",
+  display: "swap",
 });
 
-const playfair = Playfair_Display({ 
+const playfair = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-playfair",
-  weight: ["400", "500", "600", "700", "800", "900"],
-  style: ["normal", "italic"],
+  display: "swap",
 });
+
+const MapProvider = dynamic(
+  () => import("@/components/maps/MapProvider").then(m => m.MapProvider),
+  { ssr: false }
+);
 
 export const metadata: Metadata = {
   title: "ClearPath Analyzer | Instant Deal Analysis",

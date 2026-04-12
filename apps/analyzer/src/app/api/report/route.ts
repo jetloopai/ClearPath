@@ -168,9 +168,9 @@ const BASE_CSS = `
   .note { font-size: 8.5px; color: #94a3b8; margin-top: 5px; font-style: italic; }
 `
 
-// ── DEAL SHEET markdown (compact 1-pager) ─────────────────────────────────────
+// ── DEAL SHEET (compact, section-toggleable) ──────────────────────────────────
 function buildDealSheet(body: Record<string, unknown>): string {
-  const { address, price, condition, results, breakdown, customRehab, arvMethod, compsCount } = body as {
+  const { address, price, condition, results, breakdown, customRehab, arvMethod, compsCount, brrrr, sections } = body as {
     address: string
     price: number
     condition: string
@@ -179,8 +179,11 @@ function buildDealSheet(body: Record<string, unknown>): string {
     customRehab: number
     arvMethod: string
     compsCount: number
+    brrrr: Record<string, number & string>
+    sections: { flip: boolean; buyhold: boolean; brrrr: boolean; mao: boolean }
   }
 
+  const sec = sections ?? { flip: true, buyhold: true, brrrr: true, mao: true }
   const rehab = customRehab ?? results.rehabEstimate
   const flipProfit = Math.round(results.arv - price - rehab - (breakdown?.sellingCosts ?? results.arv * 0.08) - (breakdown?.holdingCosts ?? price * 0.06))
   const mao = Math.round(results.arv * 0.7 - rehab)
@@ -188,24 +191,20 @@ function buildDealSheet(body: Record<string, unknown>): string {
   const condLabel = condition.charAt(0).toUpperCase() + condition.slice(1)
   const arvNote = arvMethod === 'comps_based' ? `Comps-based (${compsCount} nearby sales)` : 'Estimated from purchase price'
 
+  const brrrrSig = brrrr?.brrrrSignal as string ?? 'red'
+  const brrrrColor = brrrrSig === 'green' ? '#059669' : brrrrSig === 'yellow' ? '#d97706' : '#dc2626'
+
   return `<style>${BASE_CSS}
-    .deal-hero {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 14px;
-      margin-bottom: 18px;
-      page-break-inside: avoid;
-    }
-    .deal-hero .box {
-      text-align: center;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 14px 8px;
-      page-break-inside: avoid;
-    }
-    .deal-hero .box .v { font-size: 18px; font-weight: 700; color: #1e293b; }
-    .deal-hero .box .l { font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.12em; color: #94a3b8; margin-top: 3px; }
+    .hero { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:18px; }
+    .hero .box { text-align:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px 8px; }
+    .hero .box .v { font-size:18px; font-weight:700; color:#1e293b; }
+    .hero .box .l { font-size:8px; text-transform:uppercase; letter-spacing:0.12em; color:#94a3b8; margin-top:3px; }
+    .brrrr-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:8px 0 12px; }
+    .brrrr-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:10px 8px; text-align:center; }
+    .brrrr-box.warn { background:#fffbeb; border-color:#fde68a; }
+    .brrrr-box.bad { background:#fff1f2; border-color:#fecdd3; }
+    .brrrr-box .bv { font-size:15px; font-weight:700; color:#1e293b; }
+    .brrrr-box .bl { font-size:8px; text-transform:uppercase; letter-spacing:0.1em; color:#94a3b8; margin-top:2px; }
   </style>
 
 <div class="header">
@@ -214,22 +213,14 @@ function buildDealSheet(body: Record<string, unknown>): string {
   <div class="meta">${today} &nbsp;·&nbsp; ${condLabel} Condition &nbsp;·&nbsp; ${arvNote}</div>
 </div>
 
-<div class="deal-hero">
-  <div class="box">
-    <div class="v">${fmt(results.arv)}</div>
-    <div class="l">After Repair Value</div>
-  </div>
-  <div class="box">
-    <div class="v ${flipProfit >= 30000 ? 'green' : flipProfit < 10000 ? 'red' : 'amber'}">${flipProfit >= 0 ? '+' : ''}${fmt(flipProfit)}</div>
-    <div class="l">Flip Profit</div>
-  </div>
-  <div class="box">
-    <div class="v ${results.monthlyCashFlow >= 300 ? 'green' : results.monthlyCashFlow < 0 ? 'red' : 'amber'}">${results.monthlyCashFlow >= 0 ? '+' : ''}${fmt(results.monthlyCashFlow)}/mo</div>
-    <div class="l">Rental Cash Flow</div>
-  </div>
+<div class="hero">
+  <div class="box"><div class="v">${fmt(results.arv)}</div><div class="l">After Repair Value</div></div>
+  <div class="box"><div class="v ${flipProfit >= 30000 ? 'green' : flipProfit < 10000 ? 'red' : 'amber'}">${flipProfit >= 0 ? '+' : ''}${fmt(flipProfit)}</div><div class="l">Flip Profit</div></div>
+  <div class="box"><div class="v ${results.monthlyCashFlow >= 300 ? 'green' : results.monthlyCashFlow < 0 ? 'red' : 'amber'}">${results.monthlyCashFlow >= 0 ? '+' : ''}${fmt(results.monthlyCashFlow)}/mo</div><div class="l">Cash Flow</div></div>
 </div>
 
-<div class="two-col">
+${sec.mao ? `
+<div class="two-col no-break">
   <div>
     <h2>Deal Parameters</h2>
     <table>
@@ -239,24 +230,48 @@ function buildDealSheet(body: Record<string, unknown>): string {
       <tr class="highlight-row"><td><strong>Max Allowable Offer</strong></td><td class="${price <= mao ? 'green' : 'red'}"><strong>${fmt(mao)}</strong></td></tr>
     </table>
     <div class="note">${price <= mao ? `Deal is ${fmt(mao - price)} under MAO ✓` : `Deal is ${fmt(price - mao)} over MAO — negotiate down`}</div>
-  </div>
+  </div>` : '<div>'}
+
   <div>
-    <h2>Flip Analysis</h2>
+${sec.flip ? `    <h2>Flip Analysis</h2>
     <table>
       <tr><td>Net Profit</td><td class="${flipProfit >= 30000 ? 'green' : flipProfit < 10000 ? 'red' : 'amber'}">${fmt(flipProfit)}</td></tr>
       <tr><td>Flip ROI</td><td>${Math.round((flipProfit / (price + rehab)) * 1000) / 10}%</td></tr>
       <tr><td>Signal</td><td>${signal(results.flipSignal as string, flipProfit >= 30000 ? 'Strong Flip' : flipProfit >= 10000 ? 'Marginal Flip' : 'Weak Flip')}</td></tr>
-    </table>
+    </table>` : ''}
 
-    <h2>Buy & Hold</h2>
+${sec.buyhold ? `    <h2>Buy &amp; Hold</h2>
     <table>
       <tr><td>Rent Estimate</td><td>${fmt(results.rentEstimate)}/mo</td></tr>
       <tr><td>Cash Flow</td><td class="${results.monthlyCashFlow >= 300 ? 'green' : results.monthlyCashFlow < 0 ? 'red' : 'amber'}">${results.monthlyCashFlow >= 0 ? '+' : ''}${fmt(results.monthlyCashFlow)}/mo</td></tr>
       <tr><td>Cash-on-Cash</td><td>${results.cashOnCash}%</td></tr>
       <tr><td>Signal</td><td>${signal(results.rentalSignal as string, results.rentalSignal === 'green' ? 'Strong Rental' : results.rentalSignal === 'yellow' ? 'Marginal Rental' : 'Weak Rental')}</td></tr>
-    </table>
+    </table>` : ''}
   </div>
 </div>
+
+${sec.brrrr && brrrr ? `
+<h2>BRRRR Refinance Analysis</h2>
+<div class="brrrr-grid">
+  <div class="brrrr-box ${brrrrSig === 'yellow' ? 'warn' : brrrrSig === 'red' ? 'bad' : ''}">
+    <div class="bv">${fmt(brrrr.refiLoan)}</div>
+    <div class="bl">Refi Loan (${Math.round(brrrr.refiLTV * 100)}% LTV)</div>
+  </div>
+  <div class="brrrr-box ${brrrrSig === 'yellow' ? 'warn' : brrrrSig === 'red' ? 'bad' : ''}">
+    <div class="bv" style="color:${brrrrColor}">${brrrr.cashLeftInDeal <= 0 ? `−${fmt(Math.abs(brrrr.cashLeftInDeal))}` : fmt(brrrr.cashLeftInDeal)}</div>
+    <div class="bl">${brrrr.cashLeftInDeal <= 0 ? 'Cash Pulled Out' : 'Cash Left In Deal'}</div>
+  </div>
+  <div class="brrrr-box ${brrrr.postRefiCashFlow >= 200 ? '' : brrrr.postRefiCashFlow >= 0 ? 'warn' : 'bad'}">
+    <div class="bv ${brrrr.postRefiCashFlow >= 200 ? 'green' : brrrr.postRefiCashFlow >= 0 ? 'amber' : 'red'}">${brrrr.postRefiCashFlow >= 0 ? '+' : ''}${fmt(brrrr.postRefiCashFlow)}/mo</div>
+    <div class="bl">Post-Refi Cash Flow</div>
+  </div>
+</div>
+<table>
+  <tr><td>All-In Cost</td><td>${fmt(brrrr.allInCost)}</td></tr>
+  <tr><td>Refi Mortgage</td><td>− ${fmt(brrrr.refiMortgage)}/mo</td></tr>
+  <tr><td>DSCR</td><td class="${brrrr.dscr >= 1.25 ? 'green' : brrrr.dscr >= 1.0 ? 'amber' : 'red'}">${Number(brrrr.dscr).toFixed(2)} ${brrrr.dscr >= 1.25 ? '✓ Lender Ready' : brrrr.dscr >= 1.0 ? '⚠ Borderline' : '✗ Negative Coverage'}</td></tr>
+  <tr class="highlight-row"><td><strong>${brrrr.cashLeftInDeal <= 0 ? '✓ Full BRRRR — All cash recycled' : `${Math.round((1 - brrrr.cashLeftInDeal / brrrr.allInCost) * 100)}% of capital recovered`}</strong></td><td class="${brrrrSig === 'green' ? 'green' : brrrrSig === 'yellow' ? 'amber' : 'red'}"><strong>${brrrrSig === 'green' ? 'Perfect BRRRR' : brrrrSig === 'yellow' ? 'Strong BRRRR' : 'Partial BRRRR'}</strong></td></tr>
+</table>` : ''}
 
 <div class="footer">
   <span>Generated by ClearPath Analyzer &nbsp;·&nbsp; clearpathassetgroup.com</span>
@@ -398,6 +413,38 @@ function buildFullReport(body: Record<string, unknown>): string {
 ${compsSection}
 
 ${altSection}
+
+${(() => {
+  const b = (body as Record<string, unknown>).brrrr as Record<string, number> | undefined
+  if (!b) return ''
+  const bSig = (b.brrrrSignal ?? 'red') as unknown as string
+  const bColor = bSig === 'green' ? '#059669' : bSig === 'yellow' ? '#d97706' : '#dc2626'
+  const allIn = (b.allInCost ?? 0) as number
+  const cashLeft = (b.cashLeftInDeal ?? 0) as number
+  const pct = allIn > 0 ? Math.round((1 - cashLeft / allIn) * 100) : 0
+  return `
+<h2>BRRRR Refinance Analysis</h2>
+<div class="two-col no-break">
+  <div>
+    <table>
+      <tr><td>All-In Cost</td><td>${fmt(allIn)}</td></tr>
+      <tr><td>Refi LTV</td><td>${Math.round((b.refiLTV ?? 0.75) * 100)}%</td></tr>
+      <tr><td>Refi Loan Amount</td><td>${fmt(b.refiLoan ?? 0)}</td></tr>
+      <tr><td>Refi Mortgage</td><td>− ${fmt(b.refiMortgage ?? 0)}/mo</td></tr>
+      <tr class="highlight-row"><td><strong>Cash ${cashLeft <= 0 ? 'Pulled Out' : 'Left in Deal'}</strong></td><td style="color:${bColor}"><strong>${cashLeft <= 0 ? `−${fmt(Math.abs(cashLeft))}` : fmt(cashLeft)}</strong></td></tr>
+    </table>
+    <div class="note">${cashLeft <= 0 ? '✓ Full BRRRR — all invested capital recovered' : `${pct}% of capital recovered at refi`}</div>
+  </div>
+  <div>
+    <table>
+      <tr><td>Post-Refi Cash Flow</td><td class="${(b.postRefiCashFlow ?? 0) >= 200 ? 'green' : (b.postRefiCashFlow ?? 0) >= 0 ? 'amber' : 'red'}">${(b.postRefiCashFlow ?? 0) >= 0 ? '+' : ''}${fmt(b.postRefiCashFlow ?? 0)}/mo</td></tr>
+      <tr><td>Post-Refi CoC</td><td>${cashLeft <= 0 ? '∞ (full recycle)' : `${b.postRefiCoC ?? 0}%`}</td></tr>
+      <tr><td>DSCR</td><td class="${(b.dscr ?? 0) >= 1.25 ? 'green' : (b.dscr ?? 0) >= 1.0 ? 'amber' : 'red'}">${Number(b.dscr ?? 0).toFixed(2)} — ${(b.dscr ?? 0) >= 1.25 ? 'Lender Ready' : (b.dscr ?? 0) >= 1.0 ? 'Borderline' : 'Negative Coverage'}</td></tr>
+      <tr class="highlight-row"><td><strong>BRRRR Signal</strong></td><td style="color:${bColor}"><strong>${bSig === 'green' ? '✓ Perfect BRRRR' : bSig === 'yellow' ? '⚡ Strong BRRRR' : '⚠ Partial BRRRR'}</strong></td></tr>
+    </table>
+  </div>
+</div>`
+})()}
 
 <div class="footer">
   <span>Generated by ClearPath Analyzer &nbsp;·&nbsp; clearpathassetgroup.com</span>

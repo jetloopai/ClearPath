@@ -35,9 +35,21 @@ export function AuthModal({ onClose }: AuthModalProps) {
 
     try {
       if (isSignUp) {
-        const { error: signUpError } = await supabase.auth.signUp({ email, password });
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+          },
+        });
         if (signUpError) throw signUpError;
-        setSuccessMsg("Check your email for the confirmation link.");
+        // If Supabase auto-confirms (email confirmation disabled in dashboard), sign in immediately
+        if (data.session) {
+          onClose();
+          router.refresh();
+        } else {
+          setSuccessMsg("Check your email for a confirmation link, then come back and sign in.");
+        }
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;
@@ -55,7 +67,7 @@ export function AuthModal({ onClose }: AuthModalProps) {
     <AnimatePresence>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center p-6">
         <div className="absolute inset-0 bg-black/70 backdrop-blur-xl" onClick={onClose} />
-        <div ref={cardRef} className="relative z-10 w-full max-w-sm glass-panel rounded-[2rem] p-10 text-center">
+        <div ref={cardRef} className="relative z-10 w-full max-w-sm rounded-[2rem] p-10 text-center bg-zinc-900 border border-white/[0.1] shadow-2xl">
           <button onClick={onClose} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -63,8 +75,8 @@ export function AuthModal({ onClose }: AuthModalProps) {
           <p className="text-sm text-zinc-400 mb-8">{isSignUp ? "Save deals and access market insights." : "Sign in to view your saved deals."}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" className="w-full bg-white/[0.03] border border-white/[0.08] rounded-2xl py-3 px-5 text-sm text-foreground focus:outline-none focus:border-indigo-500/40" />
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" className="w-full bg-white/[0.03] border border-white/[0.08] rounded-2xl py-3 px-5 text-sm text-foreground focus:outline-none focus:border-indigo-500/40" />
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" className="w-full bg-zinc-800 border border-white/[0.12] rounded-2xl py-3 px-5 text-sm text-foreground placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500/60" />
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" className="w-full bg-zinc-800 border border-white/[0.12] rounded-2xl py-3 px-5 text-sm text-foreground placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500/60" />
             
             {error && <div className="text-red-400 text-xs text-left">{error}</div>}
             {successMsg && <div className="text-emerald-400 text-xs text-left">{successMsg}</div>}

@@ -14,7 +14,7 @@ export function MapProvider({ children }: { children: ReactNode }) {
     <APIProvider 
       apiKey={apiKey} 
       libraries={["places", "geocoding"]}
-      onLoad={() => console.log("Google Maps API loaded.")}
+      onLoad={() => {}}
     >
       {children}
     </APIProvider>

@@ -1,14 +1,22 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import gsap from "gsap";
-import { Lock, TrendingDown, TrendingUp, Minus, Pencil, RotateCcw, FileText, Download } from "lucide-react";
+
+const CompsMap = dynamic(
+  () => import("@/components/CompsMap").then(m => m.CompsMap),
+  { ssr: false, loading: () => <div className="w-full h-56 rounded-2xl bg-white/[0.02] border border-white/[0.06] animate-pulse" /> }
+);
+import { Lock, TrendingDown, TrendingUp, Minus, Pencil, RotateCcw, FileText, Download, Camera, Sparkles, ChevronDown } from "lucide-react";
 import type { AnalysisResults } from "@/lib/calculations";
 import type { AnalysisBreakdown, AlternativeCondition } from "@/app/api/analyze/route";
-import type { CompListing } from "@/lib/propertyData";
+import type { CompListing, ProviderTrace } from "@/lib/propertyData";
+import type { ImageAnalysisResult } from "@/lib/imageAnalysis";
 import { trackEvent } from "@/lib/analytics";
 import { AuthModal } from "@/components/AuthModal";
 import { supabase } from "@/lib/supabase-browser";
+import { ImageUploadZone } from "@/components/ImageUploadZone";
 
 type ViewState = "loading" | "gated" | "unlocked";
 
@@ -22,13 +30,34 @@ interface StoredAnalysis {
   breakdown: AnalysisBreakdown;
   compsUsed: (CompListing & { distanceMiles: number })[];
   alternatives: AlternativeCondition[];
-  arvMethod: "comps_based" | "price_multiplier";
+  arvMethod: "comps_based" | "provider_avm" | "rough_estimate";
+  arvConfidence?: "high" | "medium" | "low";
+  arvRange?: { low: number; high: number } | null;
+  arvExplainer?: string;
+  arvProvider?: string | null;
   compsCount: number;
-  rentSource?: "zillow_nearby" | "formula";
+  rentSource?: "nearby_listings" | "provider_estimate" | "formula" | "manual";
+  rentExplainer?: string;
+  rentProvider?: string | null;
   nearbyRentCount?: number;
   nearbyRentPrices?: number[];
-  nearbyRentListings?: { price: number; url: string }[];
+  nearbyRentListings?: { price: number; url: string; address?: string | null }[];
   interestRate?: number;
+  dataWarnings?: string[];
+  providerWarnings?: string[];
+  providerTrace?: ProviderTrace | null;
+  subjectLat?: number | null;
+  subjectLng?: number | null;
+  subjectData?: {
+    source: "property_api" | "manual" | "stub";
+    provider: string | null;
+    detailsStatus: "complete" | "missing" | "stub";
+    sqftSource: "property_api" | "manual" | "missing" | "stub";
+    subjectSqft: number | null;
+    effectiveSqft: number;
+    label: string;
+    summary: string;
+  };
 }
 
 const fmt = (val: number) =>
@@ -96,8 +125,8 @@ function WaterfallBar({
       : "text-zinc-300";
 
   return (
-    <div className="flex items-center gap-4">
-      <span className="text-xs text-zinc-500 w-32 shrink-0 text-right">{label}</span>
+    <div className="flex items-center gap-2 sm:gap-4">
+      <span className="text-xs text-zinc-500 w-20 sm:w-32 shrink-0 text-right">{label}</span>
       <div className="flex-1 relative h-7 rounded-md overflow-hidden bg-white/[0.03]">
         <div
           className={`absolute inset-y-0 left-0 rounded-md ${barColor} transition-all duration-500`}
@@ -128,6 +157,10 @@ export default function ResultsView() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [savingDeal, setSavingDeal] = useState(false);
   const [dealSaved, setDealSaved] = useState(false);
+  const [priceAdjust, setPriceAdjust] = useState(0);
+  const [maoCopied, setMaoCopied] = useState(false);
+  const [targetProfit, setTargetProfit] = useState("");
+  const [altOverride, setAltOverride] = useState<AlternativeCondition | null>(null);
 
   // ── Rehab editor state ────────────────────────────────────────────────────────
   const [customRehab, setCustomRehab] = useState(0);
@@ -139,6 +172,29 @@ export default function ResultsView() {
   const flipCountRef = useRef({ val: 0 });
   const maoCountRef = useRef({ val: 0 });
 
+  // ── Deal sheet section toggles ────────────────────────────────────────────────
+  const [dealSheetSections, setDealSheetSections] = useState({
+    flip: true,
+    buyhold: true,
+    brrrr: true,
+    mao: true,
+  });
+  const toggleSection = (key: keyof typeof dealSheetSections) =>
+    setDealSheetSections(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // ── Image analysis state ──────────────────────────────────────────────────────
+  const [imageAnalysis, setImageAnalysis] = useState<ImageAnalysisResult | null>(null);
+  const [refineImages, setRefineImages] = useState<string[]>([]);
+  const [refineAnalysis, setRefineAnalysis] = useState<ImageAnalysisResult | null>(null);
+  const [refineLoading, setRefineLoading] = useState(false);
+  const [showRefinePanel, setShowRefinePanel] = useState(false);
+  const [showScopeTable, setShowScopeTable] = useState(true);
+  const confidenceColor: Record<string, string> = {
+    high: "text-emerald-400 border-emerald-500/20 bg-emerald-500/10",
+    medium: "text-amber-400 border-amber-500/20 bg-amber-500/10",
+    low: "text-zinc-400 border-white/[0.08] bg-white/[0.03]",
+  };
+
   // ── BRRRR state ───────────────────────────────────────────────────────────────
   const [refiLTV, setRefiLTV] = useState(0.75);
   const [refiLTVInput, setRefiLTVInput] = useState("75");
@@ -148,7 +204,8 @@ export default function ResultsView() {
   const [isRefiRateEditing, setIsRefiRateEditing] = useState(false);
   const [showRefiRateTooltip, setShowRefiRateTooltip] = useState(false);
   const cashOutRef = useRef({ val: 0 });
-  const [cashOutDisplay, setCashOutDisplay] = useState(0);
+  // cashOutDisplay drives re-renders via GSAP onUpdate; reading it is intentional
+  const [, setCashOutDisplay] = useState(0);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("clearpath_analysis");
@@ -164,16 +221,53 @@ export default function ResultsView() {
       return;
     }
     setAnalysis(data);
-    setState("gated");
     trackEvent('analysis_completed', { address: data.address, signal: data.results.signal, arv: data.results.arv });
-    // Init rehab state from loaded analysis
+
+    // Init rehab state
     setCustomRehab(data.results.rehabEstimate);
     setRehabInputValue(String(data.results.rehabEstimate));
     setFlipDisplay(data.results.flipProfit);
     setMaoDisplay(data.results.mao);
     flipCountRef.current.val = data.results.flipProfit;
     maoCountRef.current.val = data.results.mao;
+
+    // Init image analysis if it came from ConfigModal
+    if ((data as any).imageAnalysis) {
+      setImageAnalysis((data as any).imageAnalysis);
+    }
+
+    // fromDashboard: user already verified by dashboard — skip gate immediately
+    if ((data as any).fromDashboard) {
+      setState("unlocked");
+    }
   }, []);
+
+  // ── Auth gate logic — runs once analysis is loaded ────────────────────────────
+  // Uses onAuthStateChange instead of getSession() so it fires AFTER Supabase
+  // has finished loading the session from localStorage (INITIAL_SESSION event).
+  useEffect(() => {
+    if (!analysis) return;
+    if ((analysis as any).fromDashboard) return; // already unlocked above
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION') {
+        // Reliable: fires after client has fully initialized from storage
+        setState(session ? "unlocked" : "gated");
+      }
+
+      if (event === 'SIGNED_IN' && session) {
+        // User signed in from the gate — animate out and save
+        if (gateRef.current) gsap.to(gateRef.current, { opacity: 0, y: -20, duration: 0.4, ease: "power2.in" });
+        if (blurRef.current) gsap.to(blurRef.current, { filter: "blur(0px)", opacity: 1, duration: 1.2, ease: "power2.out", delay: 0.3 });
+        setTimeout(() => {
+          setState("unlocked");
+          handleSaveDeal();
+        }, 500);
+      }
+    });
+    return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis]);
 
   // ── Animate flip profit + MAO when customRehab changes ───────────────────────
   useEffect(() => {
@@ -279,8 +373,29 @@ export default function ResultsView() {
     compsUsed: analysis!.compsUsed,
     alternatives: analysis!.alternatives,
     arvMethod: analysis!.arvMethod,
+    arvConfidence: analysis!.arvConfidence,
+    arvRange: analysis!.arvRange,
+    arvExplainer: analysis!.arvExplainer,
     compsCount: analysis!.compsCount,
+    rentSource: analysis!.rentSource,
+    rentExplainer: analysis!.rentExplainer,
+    subjectData: analysis!.subjectData,
     customRehab,
+    // BRRRR values for report
+    brrrr: {
+      refiLTV,
+      refiLoan,
+      allInCost,
+      cashLeftInDeal,
+      refiMortgage,
+      postRefiCashFlow,
+      postRefiCoC,
+      dscr,
+      brrrrSignal,
+      effectiveRefiRate,
+    },
+    // Deal sheet section toggles (ignored for full report)
+    sections: dealSheetSections,
   });
 
   const openReport = async (reportType: "deal_sheet" | "full_report", mode: "preview" | "print") => {
@@ -309,7 +424,7 @@ export default function ResultsView() {
     if (!analysis || downloading) return;
     setDownloading(reportType);
     try {
-      // 1. Fetch the styled HTML from the server
+      // 1. Fetch HTML
       const res = await fetch("/api/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -318,32 +433,58 @@ export default function ResultsView() {
       if (!res.ok) throw new Error("Report failed");
       const html = await res.text();
 
-      // 2. Render HTML in a hidden iframe
+      // Letter page dimensions in px at 96dpi
+      const PAGE_W = 816;
+      const PAGE_H = 1056;
+
+      // 2. Render in a hidden iframe — tall enough to hold full content
       const iframe = document.createElement("iframe");
-      iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:816px;height:1056px;border:none;visibility:hidden;";
+      iframe.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${PAGE_W}px;height:${PAGE_H * 3}px;border:none;visibility:hidden;`;
       document.body.appendChild(iframe);
       iframe.contentDocument!.open();
       iframe.contentDocument!.write(html);
       iframe.contentDocument!.close();
 
-      // 3. Wait for fonts + layout
-      await new Promise(r => setTimeout(r, 1200));
+      // 3. Wait for layout + fonts
+      await new Promise(r => setTimeout(r, 1000));
 
-      // 4. Capture with html2canvas
+      // Measure real content height
+      const contentH = iframe.contentDocument!.body.scrollHeight;
+      iframe.style.height = `${contentH}px`;
+      await new Promise(r => setTimeout(r, 200));
+
+      // 4. Capture full content at 2× for sharpness
       const { default: html2canvas } = await import("html2canvas");
       const canvas = await html2canvas(iframe.contentDocument!.body, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
-        width: 816,
-        windowWidth: 816,
+        width: PAGE_W,
+        height: contentH,
+        windowWidth: PAGE_W,
+        windowHeight: contentH,
       });
 
-      // 5. Build PDF with jsPDF
+      // 5. Slice canvas into letter-page chunks and build multi-page PDF
       const { jsPDF } = await import("jspdf");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: [816, 1056] });
-      const imgData = canvas.toDataURL("image/png");
-      pdf.addImage(imgData, "PNG", 0, 0, 816, 1056);
+      const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: [PAGE_W, PAGE_H] });
+
+      const totalPages = Math.ceil(contentH / PAGE_H);
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) pdf.addPage();
+        // Crop the canvas for this page
+        const srcY = page * PAGE_H * 2;          // ×2 for scale
+        const srcH = Math.min(PAGE_H * 2, canvas.height - srcY);
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = PAGE_W * 2;
+        pageCanvas.height = PAGE_H * 2;
+        const ctx = pageCanvas.getContext("2d")!;
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        ctx.drawImage(canvas, 0, srcY, PAGE_W * 2, srcH, 0, 0, PAGE_W * 2, srcH);
+        const imgData = pageCanvas.toDataURL("image/jpeg", 0.95);
+        pdf.addImage(imgData, "JPEG", 0, 0, PAGE_W, PAGE_H);
+      }
 
       const slug = analysis.address.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
       const prefix = reportType === "full_report" ? "ClearPath-Full-Report" : "ClearPath-Deal-Sheet";
@@ -366,16 +507,10 @@ export default function ResultsView() {
 
   const handleShare = () => {
     if (!analysis) return;
-    const url = new URL(window.location.origin + '/results/share');
-    url.searchParams.set('address', analysis.address);
-    url.searchParams.set('arv', String(analysis.results.arv));
-    url.searchParams.set('rehab', String(customRehab));
-    url.searchParams.set('flipProfit', String(derivedFlipProfit));
-    url.searchParams.set('cashFlow', String(analysis.results.monthlyCashFlow));
-    url.searchParams.set('signal', derivedFlipSignal);
-    url.searchParams.set('condition', analysis.condition);
+    const url = new URL(`/r/${analysis.analysisId}`, window.location.origin);
     navigator.clipboard.writeText(url.toString());
     setCopied(true);
+    trackEvent('share_deal_clicked', { address: analysis.address, signal: analysis.results.signal });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -418,21 +553,62 @@ export default function ResultsView() {
 
   if (!analysis) return null;
 
-  const { results, address, price, condition, units = 1, breakdown, compsUsed, alternatives, arvMethod, compsCount, rentSource, nearbyRentCount, nearbyRentPrices, nearbyRentListings } = analysis;
+  const {
+    results,
+    address,
+    price,
+    condition,
+    units = 1,
+    breakdown,
+    compsUsed,
+    alternatives,
+    arvMethod,
+    arvConfidence = "low",
+    arvRange,
+    arvExplainer,
+    arvProvider,
+    compsCount,
+    rentSource,
+    rentExplainer,
+    rentProvider,
+    nearbyRentCount,
+    nearbyRentPrices,
+    nearbyRentListings,
+    subjectData,
+    subjectLat,
+    subjectLng,
+  } = analysis;
+
+  // ── Alt-override layer (condition switcher) ──────────────────────────────────
+  const displayArv    = altOverride ? altOverride.arv : results.arv;
+  const displayRehab  = altOverride ? altOverride.rehabMidpoint : customRehab;
+  const displayCondition = altOverride ? altOverride.condition : condition;
 
   // ── Derived values using customRehab ─────────────────────────────────────────
-  const derivedFlipProfit = Math.round(
-    results.arv - price - customRehab -
-    (breakdown?.sellingCosts ?? results.arv * 0.08) -
-    (breakdown?.holdingCosts ?? price * 0.01 * 6)
-  );
-  const derivedMao = Math.round(results.arv * 0.7 - customRehab);
-  const derivedFlipROI = Math.round((derivedFlipProfit / (price + customRehab)) * 1000) / 10;
-  const derivedFlipSignal: "green" | "yellow" | "red" =
-    derivedFlipProfit >= 30000 ? "green" : derivedFlipProfit < 10000 ? "red" : "yellow";
+  const derivedFlipProfit = altOverride
+    ? altOverride.flipProfit
+    : Math.round(
+        results.arv - price - customRehab -
+        (breakdown?.sellingCosts ?? results.arv * 0.08) -
+        (breakdown?.holdingCosts ?? price * 0.01 * 6)
+      );
+  const derivedMao = Math.round(displayArv * 0.7 - displayRehab);
+  const derivedFlipROI = Math.round((derivedFlipProfit / (price + displayRehab)) * 1000) / 10;
+  const derivedFlipSignal: "green" | "yellow" | "red" = altOverride
+    ? altOverride.flipSignal
+    : derivedFlipProfit >= 30000 ? "green" : derivedFlipProfit < 10000 ? "red" : "yellow";
 
   const isRehabModified = customRehab !== results.rehabEstimate;
   const rehabDelta = customRehab - results.rehabEstimate;
+
+  // ── Price sensitivity derived values ─────────────────────────────────────────
+  const adjustedPrice = price + priceAdjust;
+  const holdingRate = breakdown?.holdingCosts ? breakdown.holdingCosts / price : 0.06;
+  const adjustedFlipProfit = priceAdjust !== 0
+    ? Math.round(results.arv - adjustedPrice - customRehab - (breakdown?.sellingCosts ?? results.arv * 0.08) - adjustedPrice * holdingRate)
+    : derivedFlipProfit;
+  const adjustedFlipSignal: "green" | "yellow" | "red" =
+    adjustedFlipProfit >= 30000 ? "green" : adjustedFlipProfit < 10000 ? "red" : "yellow";
 
   // ── BRRRR derived calculations ────────────────────────────────────────────────
   const allInCost = (breakdown?.downPayment ?? 0) + (breakdown?.closingCostsBuy ?? 0) + customRehab;
@@ -487,6 +663,29 @@ export default function ResultsView() {
   }
 
   const hasComps = compsUsed && compsUsed.length > 0;
+  const showTrustCallout = arvMethod === "rough_estimate" || (subjectData && subjectData.source !== "property_api");
+  const arvConfidenceLabel = arvConfidence.charAt(0).toUpperCase() + arvConfidence.slice(1);
+
+  const runRefineAnalysis = async () => {
+    if (refineImages.length === 0) return;
+    setRefineLoading(true);
+    try {
+      const res = await fetch("/api/analyze-images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: refineImages }),
+      });
+      if (!res.ok) throw new Error();
+      const result: ImageAnalysisResult = await res.json();
+      setRefineAnalysis(result);
+    } catch {
+      // silently fail
+    } finally {
+      setRefineLoading(false);
+    }
+  };
+
+  const activeImageAnalysis = refineAnalysis ?? imageAnalysis;
 
   return (
     <div ref={containerRef} className="max-w-5xl mx-auto">
@@ -496,7 +695,7 @@ export default function ResultsView() {
         <h1 className="text-3xl md:text-4xl font-light text-zinc-200">{address}</h1>
         <p className="text-xs text-zinc-600 mt-2 capitalize">
           {results.units > 1 ? `${results.units}-Unit · ` : ""}{condition} condition ·{" "}
-          {arvMethod === "comps_based" ? `ARV from ${compsCount} nearby comp${compsCount !== 1 ? "s" : ""}` : "ARV estimated from price"}
+          {arvMethod === "comps_based" ? `ARV from ${compsCount} nearby comp${compsCount !== 1 ? "s" : ""}` : "ARV shown as rough estimate"}
         </p>
 
         {results.isCookCounty && (
@@ -516,8 +715,53 @@ export default function ResultsView() {
         <div className="border-b border-white/[0.06] mt-8" />
       </div>
 
+      {/* ── Data quality warnings ── */}
+      {analysis.dataWarnings && analysis.dataWarnings.length > 0 && (
+        <div className="mb-6 space-y-2">
+          {analysis.dataWarnings.map((warning, i) => (
+            <div key={i} className="flex items-start gap-3 px-5 py-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+              <span className="text-amber-400 text-sm mt-0.5 shrink-0">⚠</span>
+              <p className="text-xs text-amber-300 leading-relaxed">{warning}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── Section 1: Deal Narrative ── */}
-      <div className="result-card glass-panel rounded-[2rem] p-8 mb-6">
+      {showTrustCallout && (
+        <div className="mb-6 rounded-[2rem] border border-amber-500/20 bg-amber-500/10 px-6 py-5">
+          <div className="text-xs uppercase tracking-widest text-amber-300 mb-2">Underwriting Trust Check</div>
+          <p className="text-sm text-amber-100/90 leading-relaxed">
+            {subjectData?.summary ?? "Some core property facts were incomplete, so treat this analysis as directional until the missing data is verified."}
+          </p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="glass-panel rounded-2xl p-4">
+          <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">ARV Source</div>
+          <div className="text-sm text-zinc-200">
+            {arvMethod === "comps_based" ? "Comps-based" : arvMethod === "provider_avm" ? (arvProvider ?? "Provider AVM") : "Rough estimate"}
+          </div>
+          <p className="text-xs text-zinc-500 mt-2">{arvExplainer ?? "ARV source unavailable."}</p>
+        </div>
+        <div className="glass-panel rounded-2xl p-4">
+          <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">Rent Source</div>
+          <div className="text-sm text-zinc-200">
+            {rentSource === "manual" ? "Manual override" : rentSource === "nearby_listings" ? `${rentProvider ?? "Provider"} listings` : rentSource === "provider_estimate" ? `${rentProvider ?? "Provider"} estimate` : "Formula estimate"}
+          </div>
+          <p className="text-xs text-zinc-500 mt-2">{rentExplainer ?? "Rent source unavailable."}</p>
+        </div>
+        <div className="glass-panel rounded-2xl p-4">
+          <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">Subject Facts</div>
+          <div className="text-sm text-zinc-200">{subjectData?.label ?? "Property details"}</div>
+          <p className="text-xs text-zinc-500 mt-2">
+            {subjectData ? `${subjectData.effectiveSqft.toLocaleString()} sq ft used in the analysis.` : "Subject data source unavailable."}
+          </p>
+        </div>
+      </div>
+
+      <div className="result-card glass-panel rounded-[2rem] p-5 md:p-8 mb-6">
         <div className="flex items-start gap-4">
           <div className="mt-1 shrink-0">
             {results.signal === "green" ? (
@@ -542,16 +786,55 @@ export default function ResultsView() {
       {/* ── Section 2: ARV + Rehab ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* ARV card */}
-        <div className="result-card glass-panel rounded-[2rem] p-8">
+        <div className="result-card glass-panel rounded-[2rem] p-5 md:p-8">
           <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">After Repair Value (ARV)</div>
-          <div className="text-4xl md:text-5xl font-serif text-foreground">{fmt(results.arv)}</div>
+          <div className="text-3xl md:text-5xl font-serif text-foreground">{fmt(displayArv)}</div>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <span className={`text-[10px] px-2 py-1 rounded-full border ${
+              arvConfidence === "high"
+                ? "border-emerald-500/20 text-emerald-400 bg-emerald-500/10"
+                : arvConfidence === "medium"
+                ? "border-amber-500/20 text-amber-400 bg-amber-500/10"
+                : "border-white/[0.08] text-zinc-400 bg-white/[0.04]"
+            }`}>
+              {arvConfidenceLabel} confidence
+            </span>
+            <span className="text-[10px] px-2 py-1 rounded-full border border-white/[0.08] text-zinc-400 bg-white/[0.04]">
+              {arvMethod === "comps_based" ? `${compsCount} comps used` : "No comp-backed ARV"}
+            </span>
+          </div>
+          {arvRange && (() => {
+            const span = arvRange.high - arvRange.low;
+            const midPct = span > 0 ? ((results.arv - arvRange.low) / span) * 100 : 50;
+            return (
+              <div className="mt-3">
+                <div className="flex justify-between text-[10px] text-zinc-600 mb-1">
+                  <span>{fmt(arvRange.low)}</span>
+                  <span>{fmt(arvRange.high)}</span>
+                </div>
+                <div className="relative h-1.5 rounded-full bg-white/[0.06]">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full bg-indigo-500/30"
+                    style={{ width: "100%" }}
+                  />
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-indigo-400 border border-white/20 shadow"
+                    style={{ left: `calc(${Math.min(Math.max(midPct, 4), 96)}% - 5px)` }}
+                  />
+                </div>
+                <div className="text-[10px] text-zinc-600 mt-1 text-center">
+                  ARV range · {fmt(span)} spread
+                </div>
+              </div>
+            );
+          })()}
           <div className="text-xs text-zinc-600 mt-3">
-            {arvMethod === "comps_based" ? `Based on ${compsCount} nearby comps` : "Estimated from purchase price"}
+            {arvExplainer ?? (arvMethod === "comps_based" ? `Based on ${compsCount} nearby comps` : "Estimated from purchase price")}
           </div>
         </div>
 
         {/* Rehab card — editable */}
-        <div className="result-card glass-panel rounded-[2rem] p-8">
+        <div className="result-card glass-panel rounded-[2rem] p-5 md:p-8">
           <div className="flex items-center justify-between mb-2">
             <div className="text-xs uppercase tracking-widest text-zinc-500">Estimated Rehab Cost</div>
             {isRehabModified && (
@@ -663,10 +946,128 @@ export default function ResultsView() {
           </div>
 
           <span className="inline-block mt-4 text-xs px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 capitalize">
-            {condition}
+            {displayCondition}
           </span>
         </div>
       </div>
+
+      {/* ── Condition override banner ── */}
+      {altOverride && (
+        <div className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-4">
+          <span className="text-xs text-indigo-300">
+            Viewing <span className="font-medium capitalize">{altOverride.condition}</span> condition — ARV {fmt(altOverride.arv)}, Rehab {fmt(altOverride.rehabMidpoint)}, Flip {altOverride.flipProfit >= 0 ? "+" : ""}{fmt(altOverride.flipProfit)}
+          </span>
+          <button
+            onClick={() => setAltOverride(null)}
+            className="ml-auto text-[11px] text-indigo-400 hover:text-white border border-indigo-500/30 hover:border-indigo-500/60 px-2.5 py-1 rounded-full transition-all"
+          >
+            ← Back to {condition}
+          </button>
+        </div>
+      )}
+
+      {/* ── MAO Hero Card ── */}
+      <div className="result-card glass-panel rounded-[2rem] p-5 md:p-8 mb-6">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+          <div className="flex-1">
+            <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Max Allowable Offer (70% Rule)</div>
+            <div className="flex items-baseline gap-4 mb-2">
+              <div className={`text-4xl md:text-5xl font-serif ${price <= derivedMao ? "text-emerald-400" : "text-red-400"}`}>
+                {fmt(derivedMao)}
+              </div>
+              <button
+                onClick={() => { navigator.clipboard.writeText(String(derivedMao)); setMaoCopied(true); setTimeout(() => setMaoCopied(false), 2000); }}
+                className="text-xs px-3 py-1.5 rounded-full border border-white/[0.08] bg-white/[0.03] text-zinc-400 hover:text-white hover:border-white/[0.2] transition-all"
+              >
+                {maoCopied ? "Copied ✓" : "Copy"}
+              </button>
+            </div>
+            <p className={`text-sm ${price <= derivedMao ? "text-emerald-400" : "text-red-400"}`}>
+              {price <= derivedMao
+                ? `${fmt(derivedMao - price)} under MAO — you're in the money at ${fmt(price)}`
+                : `${fmt(price - derivedMao)} over MAO — negotiate down to ${fmt(derivedMao)} to hit 70% rule`}
+            </p>
+          </div>
+
+          {/* Price sensitivity */}
+          <div className="md:w-72 shrink-0">
+            <div className="text-xs text-zinc-600 mb-2">Adjust offer price — see flip impact:</div>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {[-30000, -20000, -10000, 0, 10000, 20000].map(adj => (
+                <button
+                  key={adj}
+                  onClick={() => setPriceAdjust(adj)}
+                  className={`text-[11px] px-2.5 py-1 rounded-full border transition-all ${
+                    priceAdjust === adj
+                      ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-300"
+                      : "bg-white/[0.02] border-white/[0.06] text-zinc-500 hover:border-white/[0.14] hover:text-zinc-300"
+                  }`}
+                >
+                  {adj === 0 ? `${fmt(price)}` : `${adj > 0 ? "+" : ""}${fmtShort(adj)}`}
+                </button>
+              ))}
+            </div>
+            {priceAdjust !== 0 && (
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                <div className="text-[10px] text-zinc-600 mb-1">At offer price {fmt(adjustedPrice)}</div>
+                <div className={`text-lg font-serif font-medium ${adjustedFlipSignal === "green" ? "text-emerald-400" : adjustedFlipSignal === "red" ? "text-red-400" : "text-amber-400"}`}>
+                  {adjustedFlipProfit >= 0 ? "+" : ""}{fmt(adjustedFlipProfit)} flip profit
+                </div>
+                <div className="text-[10px] text-zinc-600 mt-0.5">
+                  {adjustedFlipProfit >= derivedFlipProfit
+                    ? `${fmt(adjustedFlipProfit - derivedFlipProfit)} better than current`
+                    : `${fmt(derivedFlipProfit - adjustedFlipProfit)} worse than current`}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Reverse MAO ── */}
+      {(() => {
+        const targetNum = parseInt(targetProfit.replace(/[^0-9]/g, ""), 10);
+        const sellingCosts = breakdown?.sellingCosts ?? results.arv * 0.08;
+        const holdingCosts = breakdown?.holdingCosts ?? price * 0.01 * 6;
+        const maxOffer = isNaN(targetNum)
+          ? null
+          : Math.round(results.arv - customRehab - sellingCosts - holdingCosts - targetNum);
+        return (
+          <div className="result-card glass-panel rounded-[2rem] p-5 md:p-8 mb-6">
+            <div className="text-xs uppercase tracking-widest text-zinc-500 mb-3">Reverse MAO — target profit</div>
+            <p className="text-xs text-zinc-600 mb-4">Enter a profit target to see the max you can pay.</p>
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={targetProfit}
+                  onChange={e => setTargetProfit(e.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="30000"
+                  className="pl-7 pr-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-zinc-200 text-sm w-36 focus:outline-none focus:border-indigo-500/40"
+                />
+              </div>
+              {maxOffer !== null && (
+                <div className={`flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]`}>
+                  <div>
+                    <div className="text-[10px] text-zinc-600 mb-0.5">Max offer for {targetNum >= 0 ? fmt(targetNum) : "—"} profit</div>
+                    <div className={`text-2xl font-serif font-medium ${maxOffer >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {maxOffer >= 0 ? fmt(maxOffer) : "Not possible at current ARV"}
+                    </div>
+                    {maxOffer >= 0 && price > maxOffer && (
+                      <div className="text-xs text-amber-400 mt-0.5">Asking price is {fmt(price - maxOffer)} above this target</div>
+                    )}
+                    {maxOffer >= 0 && price <= maxOffer && (
+                      <div className="text-xs text-emerald-400 mt-0.5">Current price qualifies — {fmt(maxOffer - price)} of room</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Gated section ── */}
       <div className="relative mt-4">
@@ -683,12 +1084,12 @@ export default function ResultsView() {
               }`}
             >
               <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Flip Economics</div>
-              <div className={`text-4xl md:text-5xl font-serif transition-colors duration-300 ${
+              <div className={`text-3xl md:text-5xl font-serif transition-colors duration-300 ${
                 derivedFlipSignal === "green" ? "text-emerald-400" : derivedFlipSignal === "red" ? "text-red-400" : "text-amber-400"
               }`}>
                 {fmt(flipDisplay)}
               </div>
-              <div className="flex items-center gap-4 mt-4 text-sm text-zinc-400">
+              <div className="flex flex-wrap items-center gap-3 mt-4 text-sm text-zinc-400">
                 <span>ROI: {derivedFlipROI}%</span>
                 <span>MAO: {fmt(maoDisplay)}</span>
               </div>
@@ -698,17 +1099,17 @@ export default function ResultsView() {
             </div>
 
             {/* Rental card */}
-            <div className={`${state === "unlocked" ? "revealed-card" : ""} glass-panel rounded-[2rem] p-8`}>
+            <div className={`${state === "unlocked" ? "revealed-card" : ""} glass-panel rounded-[2rem] p-5 md:p-8`}>
               <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Buy & Hold (Rental)</div>
-              <div className={`text-4xl md:text-5xl font-serif ${
+              <div className={`text-3xl md:text-5xl font-serif ${
                 results.rentalSignal === "green" ? "text-emerald-400" : results.rentalSignal === "red" ? "text-red-400" : "text-amber-400"
               }`}>
                 {results.monthlyCashFlow >= 0 ? "+" : ""}
                 {fmt(results.monthlyCashFlow)}
-                <span className="text-2xl text-zinc-500">/mo</span>
+                <span className="text-xl md:text-2xl text-zinc-500">/mo</span>
               </div>
-              <div className="flex items-center gap-4 mt-4 text-sm text-zinc-400">
-                <span>Rent: {results.units > 1 ? `${fmt(results.rentPerUnit)}/unit/mo (${fmt(results.rentEstimate)} total)` : `${fmt(results.rentEstimate)}/mo`}</span>
+              <div className="flex flex-wrap items-center gap-3 mt-4 text-sm text-zinc-400">
+                <span>Rent: {results.units > 1 ? `${fmt(results.rentPerUnit)}/unit` : `${fmt(results.rentEstimate)}/mo`}</span>
                 <span>CoC: {results.cashOnCash}%</span>
               </div>
               <div className="mt-3">
@@ -716,6 +1117,115 @@ export default function ResultsView() {
               </div>
             </div>
           </div>
+
+          {/* ── AI Photo Assessment ── */}
+          {state === "unlocked" && (
+            <div className="revealed-card glass-panel rounded-[2rem] p-8 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-zinc-500" />
+                  <div className="text-xs uppercase tracking-widest text-zinc-500">AI Photo Assessment</div>
+                </div>
+                {activeImageAnalysis && (
+                  <div className="flex items-center gap-2">
+                    <span className="capitalize text-xs text-zinc-300 font-medium">{activeImageAnalysis.condition}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${confidenceColor[activeImageAnalysis.confidence]}`}>
+                      {activeImageAnalysis.confidence} confidence
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {activeImageAnalysis ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-zinc-400 leading-relaxed">{activeImageAnalysis.summary}</p>
+
+                  {activeImageAnalysis.scopeOfWork.length > 0 && (
+                    <div>
+                      <button
+                        onClick={() => setShowScopeTable(!showScopeTable)}
+                        className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors mb-3"
+                      >
+                        <ChevronDown className={`w-3 h-3 transition-transform ${showScopeTable ? "rotate-180" : ""}`} />
+                        Scope of Work ({activeImageAnalysis.scopeOfWork.length} items)
+                      </button>
+                      {showScopeTable && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-[10px] uppercase tracking-widest text-zinc-600 border-b border-white/[0.06]">
+                                <th className="text-left py-2 pr-4 font-normal">Category</th>
+                                <th className="text-left py-2 pr-4 font-normal">Issue</th>
+                                <th className="text-right py-2 font-normal">Est. Cost</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {activeImageAnalysis.scopeOfWork.map((item, i) => (
+                                <tr key={i} className="border-b border-white/[0.03]">
+                                  <td className="py-2.5 pr-4 text-zinc-400 text-xs font-medium whitespace-nowrap">{item.category}</td>
+                                  <td className="py-2.5 pr-4 text-zinc-500 text-xs">{item.issue}</td>
+                                  <td className="py-2.5 text-right text-zinc-300 text-xs whitespace-nowrap">{item.estimatedCost}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-white/[0.05]">
+                    <button
+                      onClick={() => setShowRefinePanel(!showRefinePanel)}
+                      className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      {showRefinePanel ? "Hide" : "Add more photos to refine assessment"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <button
+                    onClick={() => setShowRefinePanel(!showRefinePanel)}
+                    className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4 text-indigo-500/60" />
+                    Upload photos for AI condition assessment
+                    <ChevronDown className={`w-3 h-3 transition-transform ${showRefinePanel ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
+              )}
+
+              {showRefinePanel && (
+                <div className="mt-4 pt-4 border-t border-white/[0.05] space-y-3">
+                  <div className="text-xs text-zinc-600">
+                    {activeImageAnalysis ? "Add more photos — up to 10 total" : "Upload interior and exterior photos for best results"}
+                  </div>
+                  <ImageUploadZone images={refineImages} onChange={setRefineImages} maxImages={10} />
+                  {refineImages.length > 0 && (
+                    <button
+                      onClick={runRefineAnalysis}
+                      disabled={refineLoading}
+                      className="px-5 py-2.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
+                    >
+                      {refineLoading ? "Analyzing..." : "Analyze Photos"}
+                    </button>
+                  )}
+                  {refineAnalysis && !refineLoading && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                      <div className="text-xs text-zinc-400">
+                        Updated assessment: <span className="capitalize text-white font-medium">{refineAnalysis.condition}</span>
+                        <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full border ${confidenceColor[refineAnalysis.confidence]}`}>
+                          {refineAnalysis.confidence}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Section 3: Flip Cost Waterfall ── */}
           {breakdown && (
@@ -755,9 +1265,19 @@ export default function ResultsView() {
                 <div className="flex justify-between items-center py-2 border-b border-white/[0.04]">
                   <span className="text-sm text-zinc-400">
                     {units > 1 ? `Gross Rent (${units} units)` : "Gross Rent"}
-                    {rentSource === "zillow_nearby" && nearbyRentCount && nearbyRentCount > 0 && (
+                    {rentSource === "nearby_listings" && nearbyRentCount && nearbyRentCount > 0 && (
                       <span className="ml-2 text-[10px] text-emerald-500 border border-emerald-500/20 rounded-full px-1.5 py-0.5">
-                        {nearbyRentCount} Zillow listings
+                        {nearbyRentCount} provider listings
+                      </span>
+                    )}
+                    {rentSource === "manual" && (
+                      <span className="ml-2 text-[10px] text-indigo-300 border border-indigo-500/20 rounded-full px-1.5 py-0.5">
+                        manual override
+                      </span>
+                    )}
+                    {rentSource === "provider_estimate" && (
+                      <span className="ml-2 text-[10px] text-sky-300 border border-sky-500/20 rounded-full px-1.5 py-0.5">
+                        provider estimate
                       </span>
                     )}
                     {rentSource === "formula" && (
@@ -774,12 +1294,16 @@ export default function ResultsView() {
                   </div>
                 </div>
 
+                {rentExplainer && (
+                  <p className="text-xs text-zinc-600 mt-3">{rentExplainer}</p>
+                )}
+
                 {/* Nearby rental listings used as basis */}
                 {(() => {
                   const listings = nearbyRentListings && nearbyRentListings.length > 0
                     ? nearbyRentListings
                     : nearbyRentPrices && nearbyRentPrices.length > 0
-                    ? nearbyRentPrices.map(p => ({ price: p, url: '' }))
+                    ? nearbyRentPrices.map(p => ({ price: p, url: '', address: null }))
                     : null;
                   if (!listings) return null;
                   return (
@@ -794,7 +1318,15 @@ export default function ResultsView() {
                               : "bg-white/[0.03] border-white/[0.06] text-zinc-500 hover:border-white/[0.12] hover:text-zinc-300"
                           }`;
                           return l.url ? (
-                            <a key={i} href={l.url} target="_blank" rel="noopener noreferrer" className={cls}>
+                            <a
+                              key={i}
+                              href={l.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={cls}
+                              title={l.address ? `Open listing search for ${l.address}` : 'Open listing search'}
+                              aria-label={l.address ? `Open listing search for ${l.address}` : 'Open listing search'}
+                            >
                               {fmt(l.price)}/mo ↗
                             </a>
                           ) : (
@@ -1100,12 +1632,34 @@ export default function ResultsView() {
           </div>
 
           {/* ── Section 6: Comps Used ── */}
+          {!hasComps && (analysis as any).fromDashboard && (
+            <div className={`${state === "unlocked" ? "revealed-card" : ""} glass-panel rounded-[2rem] p-6 mb-6 flex items-center gap-3`}>
+              <div className="text-xs uppercase tracking-widest text-zinc-600">Comparable Sales</div>
+              <span className="text-xs text-zinc-700">— comp addresses not stored. Re-run the analysis from the home page to see the full comp table.</span>
+            </div>
+          )}
           {hasComps && (
             <div className={`${state === "unlocked" ? "revealed-card" : ""} glass-panel rounded-[2rem] p-8 mb-6`}>
               <div className="flex items-center justify-between mb-6">
                 <div className="text-xs uppercase tracking-widest text-zinc-500">Comparable Properties Used for ARV</div>
                 <span className="text-xs text-zinc-600">{compsUsed.length} comps</span>
               </div>
+              {subjectLat && subjectLng && (
+                <div className="mb-6">
+                  <CompsMap
+                    subjectLat={subjectLat}
+                    subjectLng={subjectLng}
+                    subjectAddress={address}
+                    comps={compsUsed.map(c => ({
+                      address: c.address,
+                      price: c.price,
+                      distanceMiles: c.distanceMiles,
+                      latitude: c.latitude,
+                      longitude: c.longitude,
+                    }))}
+                  />
+                </div>
+              )}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -1126,7 +1680,27 @@ export default function ResultsView() {
                         <tr key={i} className="border-b border-white/[0.03]">
                           <td className="py-2.5 pr-4 text-zinc-500">{comp.distanceMiles.toFixed(2)} mi</td>
                           <td className="py-2.5 pr-4 text-zinc-400 text-xs" title={comp.address || "No address data"}>
-                            <div className="max-w-[180px] truncate">{comp.address || "N/A"}</div>
+                            {comp.address ? (
+                              <a
+                                href={comp.url || (() => {
+                                  // Build a Redfin address URL: /STATE/City-Slug/Street-Slug-ZIP/
+                                  const parts = comp.address.split(',').map((s: string) => s.trim())
+                                  const street = (parts[0] || '').replace(/\s+/g, '-')
+                                  const city = (parts[1] || '').replace(/\s+/g, '-')
+                                  const stateZip = (parts[2] || '').trim().split(/\s+/)
+                                  const state = stateZip[0] || ''
+                                  const zip = stateZip[1] || ''
+                                  return `https://www.redfin.com/${state}/${city}/${street}-${zip}/`
+                                })()}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="max-w-[180px] truncate block hover:text-indigo-400 transition-colors underline-offset-2 hover:underline"
+                              >
+                                {comp.address}
+                              </a>
+                            ) : (
+                              <div className="max-w-[180px] truncate">N/A</div>
+                            )}
                           </td>
                           <td className="py-2.5 pr-4 text-right text-zinc-400 text-xs whitespace-nowrap">
                             {(() => {
@@ -1160,7 +1734,7 @@ export default function ResultsView() {
             <div className={`${state === "unlocked" ? "revealed-card" : ""} glass-panel rounded-[2rem] p-8 mb-6`}>
               <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">What Would Work?</div>
               <p className="text-xs text-zinc-600 mb-6">
-                How the deal changes at each rehab scope — same purchase price of {fmt(price)}.
+                How the deal changes at each rehab scope — same purchase price of {fmt(price)}. Click any row to view that condition.
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -1175,30 +1749,41 @@ export default function ResultsView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {alternatives.map((alt) => (
-                      <tr key={alt.condition} className={`border-b border-white/[0.03] ${alt.condition === condition ? "bg-indigo-500/5" : ""}`}>
-                        <td className="py-2.5 pr-4 capitalize text-zinc-400">
-                          {alt.condition}
-                          {alt.condition === condition && (
-                            <span className="ml-2 text-[10px] text-indigo-400 border border-indigo-500/20 rounded-full px-1.5 py-0.5">selected</span>
-                          )}
-                        </td>
-                        <td className="py-2.5 pr-4 text-right text-zinc-300">{fmtShort(alt.arv)}</td>
-                        <td className="py-2.5 pr-4 text-right text-zinc-500">{fmtShort(alt.rehabMidpoint)}</td>
-                        <td className={`py-2.5 pr-4 text-right font-medium ${alt.flipSignal === "green" ? "text-emerald-400" : alt.flipSignal === "red" ? "text-red-400" : "text-amber-400"}`}>
-                          {alt.flipProfit >= 0 ? "+" : ""}{fmtShort(alt.flipProfit)}
-                        </td>
-                        <td className={`py-2.5 pr-4 text-right font-medium ${alt.rentalSignal === "green" ? "text-emerald-400" : alt.rentalSignal === "red" ? "text-red-400" : "text-amber-400"}`}>
-                          {alt.monthlyCashFlow >= 0 ? "+" : ""}{fmtShort(alt.monthlyCashFlow)}/mo
-                        </td>
-                        <td className="py-2.5 text-right">
-                          <span className="inline-flex gap-1 items-center">
-                            <SignalDot signal={alt.flipSignal} />
-                            <SignalDot signal={alt.rentalSignal} />
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {alternatives.map((alt) => {
+                      const isActive = altOverride ? alt.condition === altOverride.condition : alt.condition === condition;
+                      return (
+                        <tr
+                          key={alt.condition}
+                          onClick={() => setAltOverride(alt.condition === condition ? null : alt)}
+                          className={`border-b border-white/[0.03] cursor-pointer transition-colors ${
+                            isActive ? "bg-indigo-500/[0.08]" : "hover:bg-white/[0.02]"
+                          }`}
+                        >
+                          <td className="py-2.5 pr-4 capitalize text-zinc-400">
+                            {alt.condition}
+                            {isActive && (
+                              <span className="ml-2 text-[10px] text-indigo-400 border border-indigo-500/20 rounded-full px-1.5 py-0.5">
+                                {alt.condition === condition ? "original" : "viewing"}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right text-zinc-300">{fmtShort(alt.arv)}</td>
+                          <td className="py-2.5 pr-4 text-right text-zinc-500">{fmtShort(alt.rehabMidpoint)}</td>
+                          <td className={`py-2.5 pr-4 text-right font-medium ${alt.flipSignal === "green" ? "text-emerald-400" : alt.flipSignal === "red" ? "text-red-400" : "text-amber-400"}`}>
+                            {alt.flipProfit >= 0 ? "+" : ""}{fmtShort(alt.flipProfit)}
+                          </td>
+                          <td className={`py-2.5 pr-4 text-right font-medium ${alt.rentalSignal === "green" ? "text-emerald-400" : alt.rentalSignal === "red" ? "text-red-400" : "text-amber-400"}`}>
+                            {alt.monthlyCashFlow >= 0 ? "+" : ""}{fmtShort(alt.monthlyCashFlow)}/mo
+                          </td>
+                          <td className="py-2.5 text-right">
+                            <span className="inline-flex gap-1 items-center">
+                              <SignalDot signal={alt.flipSignal} />
+                              <SignalDot signal={alt.rentalSignal} />
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1251,23 +1836,40 @@ export default function ResultsView() {
               <Lock className="w-8 h-8 text-indigo-400 mx-auto mb-4" />
               <h3 className="text-xl font-serif text-foreground mb-2">Unlock the Full Deal Breakdown</h3>
               <p className="text-sm text-zinc-400 mb-6">
-                Enter your email to see monthly cash flow, flip waterfall, comparable properties, and your Maximum
-                Allowable Offer with full context.
+                See cash flow, flip waterfall, comps, and your MAO — and save this deal to your account.
               </p>
-              <form onSubmit={handleUnlock} className="space-y-3">
+
+              {/* Primary: Sign in to save */}
+              <button
+                type="button"
+                onClick={() => setShowAuthModal(true)}
+                className="w-full py-4 rounded-full bg-indigo-500 hover:bg-indigo-400 text-white font-medium text-sm transition-colors mb-3"
+              >
+                Sign in to unlock &amp; save deal
+              </button>
+
+              {/* Divider */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex-1 h-px bg-white/[0.06]" />
+                <span className="text-xs text-zinc-600">or</span>
+                <div className="flex-1 h-px bg-white/[0.06]" />
+              </div>
+
+              {/* Secondary: Email-only */}
+              <form onSubmit={handleUnlock} className="space-y-2">
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Email address..."
-                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-full py-4 px-6 text-foreground placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/40 transition-colors"
+                  placeholder="Continue with email only..."
+                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-full py-3.5 px-6 text-foreground placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/40 transition-colors text-sm"
                 />
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-4 rounded-full bg-foreground text-background font-medium text-sm hover:bg-zinc-200 transition-colors disabled:opacity-60"
+                  className="w-full py-3.5 rounded-full border border-white/[0.08] bg-white/[0.03] text-zinc-300 hover:bg-white/[0.06] font-medium text-sm transition-colors disabled:opacity-60"
                 >
-                  {submitting ? "Unlocking..." : "Unlock Full Analysis"}
+                  {submitting ? "Unlocking..." : "Unlock without account"}
                 </button>
               </form>
               <p className="text-xs text-zinc-600 mt-3">No spam. Unsubscribe anytime.</p>
@@ -1300,6 +1902,28 @@ export default function ResultsView() {
                     <div className="text-xs text-zinc-500">1-page · partners &amp; lenders</div>
                   </div>
                 </div>
+
+                {/* Section toggles */}
+                <div className="mb-3 space-y-1.5">
+                  {([
+                    { key: "flip",    label: "Flip Analysis" },
+                    { key: "buyhold", label: "Buy & Hold" },
+                    { key: "brrrr",   label: "BRRRR Analysis" },
+                    { key: "mao",     label: "MAO / Key Numbers" },
+                  ] as const).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => toggleSection(key)}
+                      className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg bg-white/[0.02] border border-white/[0.05] hover:border-indigo-500/20 transition-all"
+                    >
+                      <span className="text-xs text-zinc-400">{label}</span>
+                      <span className={`w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${dealSheetSections[key] ? "bg-indigo-500" : "bg-white/10"}`}>
+                        <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${dealSheetSections[key] ? "translate-x-3" : "translate-x-0"}`} />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
                 <div className="flex gap-2">
                   <button
                     onClick={() => openReport("deal_sheet", "preview")}
@@ -1327,7 +1951,7 @@ export default function ResultsView() {
                   </div>
                   <div>
                     <div className="text-sm font-medium text-zinc-200">Full Report</div>
-                    <div className="text-xs text-zinc-500">All sections · comps · P&amp;L · scenarios</div>
+                    <div className="text-xs text-zinc-500">Flip · Rental · BRRRR · Comps · Scenarios</div>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -1353,55 +1977,61 @@ export default function ResultsView() {
           </div>
 
           {/* Secondary nav */}
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-wrap justify-center gap-3">
             <button
               onClick={() => window.history.back()}
-              className="px-6 py-3 rounded-full border border-white/[0.06] text-sm text-zinc-400 hover:text-foreground hover:border-white/[0.12] transition-all"
+              className="px-5 py-3 rounded-full border border-white/[0.06] text-sm text-zinc-400 hover:text-foreground hover:border-white/[0.12] transition-all"
             >
               Edit Inputs
             </button>
             <button
               onClick={handleSaveDeal}
               disabled={savingDeal || dealSaved}
-              className="px-6 py-3 rounded-full border border-white/[0.06] text-sm text-zinc-400 hover:text-foreground hover:border-white/[0.12] transition-all disabled:opacity-50"
+              className="px-5 py-3 rounded-full border border-white/[0.06] text-sm text-zinc-400 hover:text-foreground hover:border-white/[0.12] transition-all disabled:opacity-50"
             >
               {dealSaved ? "✓ Saved" : savingDeal ? "Saving..." : "Save Deal"}
             </button>
             <button
               onClick={handleShare}
-              className="px-6 py-3 rounded-full border border-white/[0.06] text-sm text-zinc-400 hover:text-foreground hover:border-white/[0.12] transition-all"
+              className="px-5 py-3 rounded-full border border-white/[0.06] text-sm text-zinc-400 hover:text-foreground hover:border-white/[0.12] transition-all"
             >
-              {copied ? "Link Copied!" : "Share Link"}
+              {copied ? "Link Copied ✓" : "Share Link"}
             </button>
           </div>
         </div>
       )}
 
       {/* Lender Matching CTA (Phase 2 Prep) */}
-      {state === "unlocked" && breakdown && (
+      {state === "unlocked" && (
         <div className="mt-16 relative glass-panel rounded-[2rem] overflow-hidden">
           <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500" />
           <div className="p-8 md:p-12 text-center">
             <div className="text-4xl mb-4">💰</div>
             <h3 className="text-2xl font-serif text-foreground mb-4">Need financing for this deal?</h3>
-            
-            <div className="max-w-md mx-auto bg-black/40 rounded-2xl p-6 border border-white/[0.05] mb-8 text-left text-sm">
-              <div className="text-xs uppercase tracking-widest text-zinc-500 mb-4 font-semibold">Based on your analysis:</div>
-              <ul className="space-y-3">
-                <li className="flex justify-between">
-                  <span className="text-zinc-400">Purchase</span>
-                  <span className="text-zinc-200 font-medium">{fmt(price)}</span>
-                </li>
-                <li className="flex justify-between">
-                  <span className="text-zinc-400">Down payment</span>
-                  <span className="text-zinc-200 font-medium">{fmt(breakdown.downPayment)} ({Math.round((breakdown.downPayment / price) * 100)}%)</span>
-                </li>
-                <li className="flex justify-between pt-3 border-t border-white/[0.05]">
-                  <span className="text-zinc-300 font-medium">Loan needed</span>
-                  <span className="text-amber-400 font-bold font-serif text-lg">{fmt(price - breakdown.downPayment)}</span>
-                </li>
-              </ul>
-            </div>
+
+            {(() => {
+              const downPayment = breakdown?.downPayment ?? Math.round(price * 0.25);
+              const loanNeeded = price - downPayment;
+              return (
+                <div className="max-w-md mx-auto bg-black/40 rounded-2xl p-6 border border-white/[0.05] mb-8 text-left text-sm">
+                  <div className="text-xs uppercase tracking-widest text-zinc-500 mb-4 font-semibold">Based on your analysis:</div>
+                  <ul className="space-y-3">
+                    <li className="flex justify-between">
+                      <span className="text-zinc-400">Purchase</span>
+                      <span className="text-zinc-200 font-medium">{fmt(price)}</span>
+                    </li>
+                    <li className="flex justify-between">
+                      <span className="text-zinc-400">Down payment</span>
+                      <span className="text-zinc-200 font-medium">{fmt(downPayment)} ({Math.round((downPayment / price) * 100)}%)</span>
+                    </li>
+                    <li className="flex justify-between pt-3 border-t border-white/[0.05]">
+                      <span className="text-zinc-300 font-medium">Loan needed</span>
+                      <span className="text-amber-400 font-bold font-serif text-lg">{fmt(loanNeeded)}</span>
+                    </li>
+                  </ul>
+                </div>
+              );
+            })()}
 
             <div className="flex flex-wrap justify-center gap-3 mb-8">
               {['Hard Money', 'DSCR Loan', 'Conventional'].map((loan) => (
@@ -1409,7 +2039,8 @@ export default function ResultsView() {
                   key={loan}
                   onClick={() => {
                     setSelectedLoan(loan);
-                    trackEvent('financing_interest', { loan_type: loan, loan_amount: price - breakdown.downPayment });
+                    const downPayment = breakdown?.downPayment ?? Math.round(price * 0.25);
+                    trackEvent('financing_interest', { loan_type: loan, loan_amount: price - downPayment });
                   }}
                   className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all border ${
                     selectedLoan === loan
