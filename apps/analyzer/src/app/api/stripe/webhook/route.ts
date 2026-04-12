@@ -3,7 +3,7 @@ import { stripe, PLANS, getPlanByPriceId } from '@/lib/stripe'
 import { supabaseAdmin } from '@/lib/supabase-server'
 import type Stripe from 'stripe'
 
-export const config = { api: { bodyParser: false } }
+export const dynamic = 'force-dynamic'
 
 async function getUserIdFromCustomer(customerId: string): Promise<string | null> {
   const { data } = await supabaseAdmin
