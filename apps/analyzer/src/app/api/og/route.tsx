@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
 
-    const address = searchParams.get('address') || 'Sample Property Address';
+    const address = (searchParams.get('address') || 'Sample Property Address').slice(0, 200);
     const arv = Number(searchParams.get('arv')) || 0;
     const flipProfit = Number(searchParams.get('flipProfit')) || 0;
     const cashFlow = Number(searchParams.get('cashFlow')) || 0;

@@ -291,6 +291,17 @@ export async function POST(req: NextRequest) {
         : `You have used all your ${currentPlan === 'starter' ? '50' : '300'} reports this month. Upgrade to continue.`,
     }, { status: 402 })
   }
+
+  // Atomic decrement BEFORE expensive work — prevents race condition where two
+  // simultaneous requests both pass the check above and both run at your cost.
+  const { error: decrementError, count: decrementCount } = await supabaseAdmin
+    .from('user_profiles')
+    .update({ credits_remaining: creditsRemaining - 1, updated_at: new Date().toISOString() })
+    .eq('id', authUser.id)
+    .gt('credits_remaining', 0)  // only succeeds if credit still available
+  if (decrementError || !decrementCount) {
+    return NextResponse.json({ error: 'upgrade_required', plan: currentPlan }, { status: 402 })
+  }
   // ─────────────────────────────────────────────────────────────────────────
 
   const body = await req.json()
@@ -301,7 +312,13 @@ export async function POST(req: NextRequest) {
   const manualSqft = Number(manualSqftRaw)
   const normalizedManualSqft = Number.isFinite(manualSqft) && manualSqft > 0 ? Math.round(manualSqft) : null
 
-  if (!address || !numericPrice || !condition) {
+  if (typeof address !== 'string' || address.trim().length === 0 || address.length > 500) {
+    return NextResponse.json({ error: 'Invalid address' }, { status: 400 })
+  }
+  if (!numericPrice || numericPrice < 1000 || numericPrice > 50_000_000) {
+    return NextResponse.json({ error: 'Price must be between $1,000 and $50,000,000' }, { status: 400 })
+  }
+  if (!condition) {
     return NextResponse.json({ error: 'address, price, and condition are required' }, { status: 400 })
   }
 
@@ -598,12 +615,6 @@ export async function POST(req: NextRequest) {
     console.error('Analysis insert error:', error)
     return NextResponse.json({ error: 'Failed to save analysis' }, { status: 500 })
   }
-
-  // Decrement credits after successful analysis
-  void supabaseAdmin
-    .from('user_profiles')
-    .update({ credits_remaining: Math.max(0, creditsRemaining - 1), updated_at: new Date().toISOString() })
-    .eq('id', userId)
 
   const response: AnalyzeResponse = {
     analysisId: analysis.id,

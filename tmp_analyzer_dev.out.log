@@ -1,0 +1,10 @@
+
+> analyzer@0.1.0 dev
+> next dev --turbo
+
+  ▲ Next.js 14.2.35 (turbo)
+  - Local:        http://localhost:3004
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 3.8s

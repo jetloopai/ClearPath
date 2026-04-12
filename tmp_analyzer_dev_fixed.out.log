@@ -1,0 +1,11 @@
+
+> analyzer@0.1.0 dev
+> next dev --turbo --port 3010
+
+  ▲ Next.js 14.2.35 (turbo)
+  - Local:        http://localhost:3010
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 4.4s
+[?25h

@@ -1,0 +1,51 @@
+
+> analyzer@0.1.0 dev
+> next dev --turbo --port 3010
+
+  ▲ Next.js 14.2.35 (turbo)
+  - Local:        http://localhost:3010
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 26.1s
+ ○ Compiling / ...
+ ✓ Compiled / in 38.8s
+ GET / 200 in 41225ms
+ ○ Compiling /favicon.ico ...
+ ✓ Compiled /favicon.ico in 888ms
+ GET /favicon.ico?favicon.45db1c09.ico 200 in 1507ms
+ ○ Compiling /api/user/credits ...
+ ✓ Compiled /api/user/credits in 787ms
+ GET /api/user/credits 200 in 2052ms
+ GET /api/user/credits 200 in 696ms
+ GET /api/user/credits 200 in 602ms
+ GET /api/user/credits 200 in 610ms
+ ○ Compiling /analyze ...
+ ✓ Compiled /analyze in 2.1s
+ ✓ Compiled / in 263ms
+ ○ Compiling / ...
+ ✓ Compiled in 1016ms
+ ✓ Compiled / in 1052ms
+ ○ Compiling / ...
+ ✓ Compiled in 1413ms
+ ✓ Compiled / in 1226ms
+ GET /api/user/credits 200 in 2012ms
+ ✓ Compiled in 1789ms
+ ✓ Compiled in 1103ms
+ ✓ Compiled in 595ms
+ GET /api/user/credits 200 in 1677ms
+ GET /api/user/credits 200 in 2182ms
+ ○ Compiling /api/events ...
+ ✓ Compiled /api/events in 7.4s
+ POST /api/events 200 in 8889ms
+ POST /api/analyze 402 in 8916ms
+ ✓ Compiled in 1146ms
+ ✓ Compiled in 1034ms
+ ✓ Compiled in 431ms
+ ✓ Compiled in 358ms
+  ▲ Next.js 14.2.35 (turbo)
+  - Local:        http://localhost:3010
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 25.7s

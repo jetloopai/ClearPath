@@ -5,7 +5,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { email, address, is_service_area, deal_signal, deal_arv, deal_flip_profit, deal_cash_flow, deal_condition } = body
 
-  if (!email || !email.includes('@')) {
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+  if (!email || !EMAIL_RE.test(email) || email.length > 320) {
     return NextResponse.json({ error: 'Valid email required' }, { status: 400 })
   }
 
