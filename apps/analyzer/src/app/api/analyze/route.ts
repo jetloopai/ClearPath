@@ -273,6 +273,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'sign_in_required', message: 'Sign in to run an analysis.' }, { status: 401 })
   }
 
+  // Block unverified emails
+  if (!authUser.email_confirmed_at) {
+    return NextResponse.json(
+      { error: 'email_not_verified', message: 'Please verify your email before running an analysis. Check your inbox for a confirmation link.' },
+      { status: 403 }
+    )
+  }
+
+  // Block disposable email domains
+  const DISPOSABLE_DOMAINS = new Set([
+    'mailinator.com','guerrillamail.com','tempmail.com','throwaway.email',
+    'yopmail.com','sharklasers.com','spam4.me','trashmail.com','maildrop.cc',
+    'dispostable.com','fakeinbox.com','temp-mail.org','mailnull.com','spamgourmet.com',
+  ])
+  const emailDomain = (authUser.email ?? '').split('@')[1]?.toLowerCase()
+  if (emailDomain && DISPOSABLE_DOMAINS.has(emailDomain)) {
+    return NextResponse.json(
+      { error: 'disposable_email', message: 'Please use a permanent email address to run analyses.' },
+      { status: 403 }
+    )
+  }
+
   const { data: profile } = await supabaseAdmin
     .from('user_profiles')
     .select('plan, credits_remaining')

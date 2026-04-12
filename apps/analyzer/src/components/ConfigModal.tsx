@@ -174,6 +174,12 @@ export function ConfigModal({ address, county, onClose }: ConfigModalProps) {
           return;
         }
 
+        if (res.status === 403) {
+          setError(payload?.message ?? 'Please verify your email before running an analysis.');
+          setLoading(false);
+          return;
+        }
+
         if (res.status === 422 && payload?.needsManualSqft) {
           setShowManualSqft(true);
           setShowAdvanced(true);

@@ -95,6 +95,10 @@ export default function Home() {
             </button>
           </form>
 
+          <p className="text-sm text-zinc-500 mt-3">
+            3 reports on us. <span className="text-zinc-400">No card needed.</span>
+          </p>
+
           {/* Feature pills */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-6 mb-10">
             {[
@@ -199,6 +203,50 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Pricing preview */}
+        <div className="relative z-10 w-full max-w-3xl mx-auto mt-20 mb-4 text-center">
+          <div className="text-xs uppercase tracking-widest text-zinc-600 mb-2">Simple pricing</div>
+          <h2 className="text-2xl font-serif text-foreground mb-8">Start free. Upgrade when you&apos;re ready.</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+            <div className="glass-panel rounded-2xl p-6 border border-white/[0.06]">
+              <div className="text-xs uppercase tracking-widest text-zinc-600 mb-3">Free</div>
+              <div className="text-3xl font-serif text-foreground mb-1">$0</div>
+              <div className="text-xs text-zinc-500 mb-5">forever</div>
+              <ul className="space-y-2 text-xs text-zinc-400">
+                <li className="flex gap-2"><span className="text-indigo-400">✓</span>3 deal analyses</li>
+                <li className="flex gap-2"><span className="text-indigo-400">✓</span>Full ARV + rehab + rental</li>
+                <li className="flex gap-2"><span className="text-indigo-400">✓</span>Dashboard &amp; PDF export</li>
+                <li className="flex gap-2"><span className="text-indigo-400">✓</span>No credit card needed</li>
+              </ul>
+            </div>
+            <div className="glass-panel rounded-2xl p-6 border border-indigo-500/30 bg-indigo-500/5">
+              <div className="text-xs uppercase tracking-widest text-indigo-400 mb-3">Starter</div>
+              <div className="text-3xl font-serif text-foreground mb-1">$29.99</div>
+              <div className="text-xs text-zinc-500 mb-5">/month</div>
+              <ul className="space-y-2 text-xs text-zinc-400">
+                <li className="flex gap-2"><span className="text-indigo-400">✓</span>50 analyses/month</li>
+                <li className="flex gap-2"><span className="text-indigo-400">✓</span>Everything in Free</li>
+                <li className="flex gap-2"><span className="text-indigo-400">✓</span>Share reports</li>
+                <li className="flex gap-2"><span className="text-indigo-400">✓</span>Cancel anytime</li>
+              </ul>
+            </div>
+            <div className="glass-panel rounded-2xl p-6 border border-violet-500/30 bg-violet-500/5">
+              <div className="text-xs uppercase tracking-widest text-violet-400 mb-3">Pro</div>
+              <div className="text-3xl font-serif text-foreground mb-1">$99</div>
+              <div className="text-xs text-zinc-500 mb-5">/month</div>
+              <ul className="space-y-2 text-xs text-zinc-400">
+                <li className="flex gap-2"><span className="text-violet-400">✓</span>300 analyses/month</li>
+                <li className="flex gap-2"><span className="text-violet-400">✓</span>Everything in Starter</li>
+                <li className="flex gap-2"><span className="text-violet-400">✓</span>High-volume investors</li>
+                <li className="flex gap-2"><span className="text-violet-400">✓</span>Multiple markets</li>
+              </ul>
+            </div>
+          </div>
+          <a href="/pricing" className="inline-block mt-6 text-sm text-indigo-400 hover:text-indigo-300 transition-colors">
+            See full pricing →
+          </a>
         </div>
 
         {/* How It Works */}

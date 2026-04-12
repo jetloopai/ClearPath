@@ -91,6 +91,9 @@ export function Navbar() {
             <Link href="/insights" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
               Insights
             </Link>
+            <Link href="/pricing" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+              Pricing
+            </Link>
             <Link href="/analyze" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
               Analyze Deal
             </Link>
