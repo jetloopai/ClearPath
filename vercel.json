@@ -1,7 +1,1 @@
-{
-  "buildCommand": "cd apps/analyzer && npm run build",
-  "outputDirectory": "apps/analyzer/.next",
-  "installCommand": "cd apps/analyzer && npm install",
-  "devCommand": "cd apps/analyzer && npm run dev",
-  "framework": "nextjs"
-}
+{}
