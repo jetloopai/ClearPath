@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Zap, TrendingUp } from 'lucide-react'
-import { useSupabaseBrowser } from '@/lib/supabase-browser'
+import { supabase } from '@/lib/supabase-browser'
 
 interface UpgradeModalProps {
   currentPlan: string
@@ -36,7 +36,6 @@ const PLANS = [
 ]
 
 export function UpgradeModal({ currentPlan, onClose }: UpgradeModalProps) {
-  const supabase = useSupabaseBrowser()
   const [loading, setLoading] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
