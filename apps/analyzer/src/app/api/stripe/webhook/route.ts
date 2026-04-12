@@ -71,7 +71,9 @@ export async function POST(req: NextRequest) {
       if (!userId) break
 
       // Reset credits at start of new billing period
-      const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null
+      // Stripe v22: subscription moved to invoice.parent.subscription_details.subscription
+      const invoiceAny = invoice as unknown as { subscription?: string; parent?: { subscription_details?: { subscription?: string } } }
+      const subscriptionId = invoiceAny.subscription ?? invoiceAny.parent?.subscription_details?.subscription ?? null
       if (!subscriptionId) break
 
       const subscription = await stripe.subscriptions.retrieve(subscriptionId)
