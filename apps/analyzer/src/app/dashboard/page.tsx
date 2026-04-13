@@ -73,15 +73,37 @@ function ScenarioRow({
   const signal   = deal.deal_signal ?? "yellow";
 
   return (
-    <div className="flex items-center gap-4 py-3 border-t border-white/[0.05] first:border-t-0 group/row">
-      {/* Condition + signal */}
-      <div className="w-28 shrink-0 flex items-center gap-2">
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${SIGNAL_DOT[signal] ?? "bg-zinc-400"}`} />
-        <span className="text-xs capitalize text-zinc-400">{deal.input_condition}</span>
+    <div className="py-3 border-t border-white/[0.05] first:border-t-0">
+      {/* Top row: condition + signal | time + actions */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${SIGNAL_DOT[signal] ?? "bg-zinc-400"}`} />
+          <span className="text-xs capitalize text-zinc-400 font-medium">{deal.input_condition}</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${SIGNAL_PILL[signal]}`}>
+            {SIGNAL_LABEL[signal]}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-zinc-600">{timeAgo(deal.created_at)}</span>
+          <button
+            onClick={onView}
+            className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-[11px] text-zinc-400 hover:text-white hover:border-white/[0.18] transition-all"
+          >
+            View →
+          </button>
+          <button
+            onClick={onDelete}
+            disabled={deleting}
+            className="w-6 h-6 rounded-full text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all flex items-center justify-center text-sm"
+            title="Remove"
+          >
+            ×
+          </button>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="flex-1 grid grid-cols-3 gap-3 min-w-0">
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-2">
         <div>
           <div className="text-[10px] text-zinc-600 mb-0.5">ARV</div>
           <div className="text-sm font-serif text-zinc-300">{fmt(deal.arv)}</div>
@@ -98,25 +120,6 @@ function ScenarioRow({
             {cashFlow >= 0 ? "+" : ""}{fmt(cashFlow)}<span className="text-[10px]">/mo</span>
           </div>
         </div>
-      </div>
-
-      {/* Time + actions */}
-      <div className="shrink-0 flex items-center gap-2">
-        <span className="text-[10px] text-zinc-600">{timeAgo(deal.created_at)}</span>
-        <button
-          onClick={onView}
-          className="px-3 py-1 rounded-full bg-white/[0.04] border border-white/[0.08] text-xs text-zinc-400 hover:text-white hover:border-white/[0.18] transition-all opacity-0 group-hover/row:opacity-100"
-        >
-          View →
-        </button>
-        <button
-          onClick={onDelete}
-          disabled={deleting}
-          className="w-6 h-6 rounded-full text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover/row:opacity-100 flex items-center justify-center text-sm"
-          title="Remove"
-        >
-          ×
-        </button>
       </div>
     </div>
   );
@@ -337,6 +340,7 @@ export default function DashboardPage() {
   const [time, setTime]             = useState<TimeFilter>("all");
   const [sort, setSort]             = useState<SortKey>("newest");
   const [search, setSearch]         = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -548,80 +552,100 @@ export default function DashboardPage() {
               className="w-full mb-5 bg-white/[0.03] border border-white/[0.08] rounded-2xl py-2.5 px-4 text-sm text-foreground placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/30 transition-colors"
             />
 
-            {/* Filter panel */}
-            <div className="glass-panel rounded-2xl border border-white/[0.05] px-5 py-4 mb-6 space-y-3">
-              {/* Signal */}
-              <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Signal</span>
-                <div className="flex flex-wrap gap-2">
-                  {(["green", "yellow", "red"] as const).map(s => (
-                    <Pill key={s} active={signals.includes(s)} onClick={() => toggle(signals, setSignals, s)}>
-                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${SIGNAL_DOT[s]}`} />
-                      {SIGNAL_LABEL[s]}
-                    </Pill>
-                  ))}
-                </div>
-              </div>
-
-              {/* Strategy */}
-              <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Strategy</span>
-                <div className="flex flex-wrap gap-2">
-                  {(["flip", "rental", "both"] as const).map(s => (
-                    <Pill key={s} active={strategies.includes(s)} onClick={() => toggle(strategies, setStrategies, s)}>
-                      {s === "flip" ? "Flip" : s === "rental" ? "Rental" : "Both"}
-                    </Pill>
-                  ))}
-                </div>
-              </div>
-
-              {/* Condition */}
-              <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Condition</span>
-                <div className="flex flex-wrap gap-2">
-                  {CONDITIONS.map(c => (
-                    <Pill key={c} active={conditions.includes(c)} onClick={() => toggle(conditions, setConditions, c)}>
-                      <span className="capitalize">{c}</span>
-                    </Pill>
-                  ))}
-                </div>
-              </div>
-
-              {/* Time */}
-              <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Time</span>
-                <div className="flex flex-wrap gap-2">
-                  {(["7d", "30d", "all"] as const).map(t => (
-                    <Pill key={t} active={time === t} onClick={() => setTime(t)}>
-                      {t === "7d" ? "7 days" : t === "30d" ? "30 days" : "All time"}
-                    </Pill>
-                  ))}
-                </div>
-              </div>
-
-              {/* Divider before sort */}
-              <div className="border-t border-white/[0.05] pt-3 flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-20 shrink-0">Sort by</span>
-                <div className="flex flex-wrap gap-2 flex-1">
-                  {([
-                    ["newest",        "Newest"],
-                    ["best_flip",     "Best Flip"],
-                    ["best_cashflow", "Best Cash Flow"],
-                    ["arv_high",      "ARV ↓"],
-                  ] as [SortKey, string][]).map(([key, label]) => (
-                    <Pill key={key} active={sort === key} onClick={() => setSort(key)}>{label}</Pill>
-                  ))}
-                </div>
+            {/* Filter toggle trigger + sort row */}
+            <div className="flex items-center gap-3 mb-6">
+              <button
+                onClick={() => setFiltersOpen(o => !o)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                  filtersOpen || activeFilterCount > 0
+                    ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
+                    : "bg-white/[0.03] border-white/[0.07] text-zinc-400 hover:border-white/[0.14] hover:text-zinc-200"
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M7 8h10M11 12h2" />
+                </svg>
+                Filters
                 {activeFilterCount > 0 && (
-                  <button
-                    onClick={() => { setSignals([]); setStrategies([]); setConditions([]); setTime("all"); }}
-                    className="ml-auto shrink-0 px-3 py-1.5 rounded-full text-xs text-zinc-500 hover:text-red-400 border border-transparent hover:border-red-500/20 hover:bg-red-500/5 transition-all"
-                  >
-                    Clear {activeFilterCount}
-                  </button>
+                  <span className="w-5 h-5 rounded-full bg-indigo-500 text-white text-[10px] flex items-center justify-center font-semibold">
+                    {activeFilterCount}
+                  </span>
                 )}
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {/* Sort pills — always visible */}
+              <div className="flex items-center gap-2 overflow-x-auto flex-1 min-w-0">
+                {([
+                  ["newest",        "Newest"],
+                  ["best_flip",     "Best Flip"],
+                  ["best_cashflow", "Cash Flow"],
+                  ["arv_high",      "ARV ↓"],
+                ] as [SortKey, string][]).map(([key, label]) => (
+                  <Pill key={key} active={sort === key} onClick={() => setSort(key)}>{label}</Pill>
+                ))}
               </div>
+
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => { setSignals([]); setStrategies([]); setConditions([]); setTime("all"); }}
+                  className="shrink-0 text-xs text-zinc-500 hover:text-red-400 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
             </div>
+
+            {/* Collapsible filter panel */}
+            {filtersOpen && (
+              <div className="glass-panel rounded-2xl border border-white/[0.05] px-5 py-4 mb-6 space-y-3">
+                {/* Signal */}
+                <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
+                  <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Signal</span>
+                  <div className="flex flex-wrap gap-2">
+                    {(["green", "yellow", "red"] as const).map(s => (
+                      <Pill key={s} active={signals.includes(s)} onClick={() => toggle(signals, setSignals, s)}>
+                        <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${SIGNAL_DOT[s]}`} />
+                        {SIGNAL_LABEL[s]}
+                      </Pill>
+                    ))}
+                  </div>
+                </div>
+                {/* Strategy */}
+                <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
+                  <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Strategy</span>
+                  <div className="flex flex-wrap gap-2">
+                    {(["flip", "rental", "both"] as const).map(s => (
+                      <Pill key={s} active={strategies.includes(s)} onClick={() => toggle(strategies, setStrategies, s)}>
+                        {s === "flip" ? "Flip" : s === "rental" ? "Rental" : "Both"}
+                      </Pill>
+                    ))}
+                  </div>
+                </div>
+                {/* Condition */}
+                <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
+                  <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Condition</span>
+                  <div className="flex flex-wrap gap-2">
+                    {CONDITIONS.map(c => (
+                      <Pill key={c} active={conditions.includes(c)} onClick={() => toggle(conditions, setConditions, c)}>
+                        <span className="capitalize">{c}</span>
+                      </Pill>
+                    ))}
+                  </div>
+                </div>
+                {/* Time */}
+                <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
+                  <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Time</span>
+                  <div className="flex flex-wrap gap-2">
+                    {(["7d", "30d", "all"] as const).map(t => (
+                      <Pill key={t} active={time === t} onClick={() => setTime(t)}>
+                        {t === "7d" ? "7 days" : t === "30d" ? "30 days" : "All time"}
+                      </Pill>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
 
