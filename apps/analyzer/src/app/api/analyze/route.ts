@@ -295,11 +295,21 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { data: profile } = await supabaseAdmin
+  let { data: profile } = await supabaseAdmin
     .from('user_profiles')
     .select('plan, credits_remaining')
     .eq('id', authUser.id)
     .single()
+
+  // Profile missing (signed up before trigger was active) — create it now
+  if (!profile) {
+    const { data: created } = await supabaseAdmin
+      .from('user_profiles')
+      .upsert({ id: authUser.id, plan: 'free', credits_remaining: 3, credits_monthly: 3 }, { onConflict: 'id' })
+      .select('plan, credits_remaining')
+      .single()
+    profile = created
+  }
 
   const creditsRemaining = profile?.credits_remaining ?? 0
   const currentPlan = profile?.plan ?? 'free'
