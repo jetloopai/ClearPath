@@ -103,7 +103,7 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
             { label: "Green Deals", value: `${greenPct}%` },
           ].map(({ label, value }) => (
             <div key={label} className="glass-panel rounded-2xl p-5 text-center border border-white/[0.05]">
-              <div className="text-2xl font-serif text-zinc-200">{value}</div>
+              <div className="text-xl md:text-2xl font-serif text-zinc-200">{value}</div>
               <div className="text-xs text-zinc-600 uppercase tracking-widest mt-1">{label}</div>
             </div>
           ))}
@@ -113,7 +113,7 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
         {topCities.length > 0 && (
           <div className="mb-10">
             <div className="text-xs uppercase tracking-widest text-zinc-500 mb-4">Top Cities</div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {topCities.map((city, i) => {
                 const profitColor = city.avg_profit >= 30000 ? "text-emerald-400" : city.avg_profit >= 10000 ? "text-amber-400" : "text-red-400";
                 return (
@@ -136,7 +136,7 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
         )}
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 mb-6">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3 mb-6">
           {/* State filter */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-zinc-600 uppercase tracking-widest">State</span>
@@ -155,7 +155,7 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
             ))}
           </div>
 
-          <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+          <div className="sm:ml-auto flex items-center gap-2 flex-wrap sm:justify-end">
             <span className="text-xs text-zinc-600 uppercase tracking-widest">Sort</span>
             {sortOptions.map(opt => (
               <button

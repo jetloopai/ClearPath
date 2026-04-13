@@ -363,7 +363,7 @@ export function ConfigModal({ address, county, onClose }: ConfigModalProps) {
           {/* Condition */}
           <div>
             <label className="text-xs uppercase tracking-widest text-zinc-300 mb-3 block">Property Condition</label>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-5 gap-2">
               {conditions.map((c) => (
                 <button
                   key={c.value}
@@ -402,11 +402,11 @@ export function ConfigModal({ address, county, onClose }: ConfigModalProps) {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="grid grid-cols-2 gap-4"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-4"
             >
               <div className="col-span-2">
                 <label className="text-xs text-zinc-300 mb-1 block">Property Units</label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[1, 2, 3, 4].map((u) => (
                     <button
                       key={u}

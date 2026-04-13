@@ -45,8 +45,8 @@ export function ImageUploadZone({ images, onChange, maxImages = 10, compact = fa
     readFiles(e.dataTransfer.files);
   };
 
-  const cols = compact ? "grid-cols-3" : "grid-cols-5";
-  const thumbSize = compact ? "h-20" : "h-24";
+  const cols = compact ? "grid-cols-3 sm:grid-cols-4" : "grid-cols-3 sm:grid-cols-5";
+  const thumbSize = compact ? "h-16 sm:h-20" : "h-20 sm:h-24";
   const canAdd = images.length < maxImages;
 
   return (

@@ -265,7 +265,7 @@ function AddressCard({
       )}
 
       {/* ── Card action bar ── */}
-      <div className="px-6 pb-4 flex items-center gap-2 border-t border-white/[0.04] pt-3">
+      <div className="px-4 sm:px-6 pb-4 flex flex-wrap items-center gap-2 border-t border-white/[0.04] pt-3">
         <button
           onClick={handleShare}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] text-zinc-500 hover:text-zinc-300 border border-white/[0.05] hover:border-white/[0.12] transition-all"
@@ -524,7 +524,7 @@ export default function DashboardPage() {
         {!loading && deals.length > 0 && (
           <>
             {/* Summary bar */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
               {[
                 { label: "Properties",        value: `${new Set(deals.map(d => d.input_address)).size}` },
                 { label: "Best Flip",         value: fmt(bestFlip) },
@@ -551,8 +551,8 @@ export default function DashboardPage() {
             {/* Filter panel */}
             <div className="glass-panel rounded-2xl border border-white/[0.05] px-5 py-4 mb-6 space-y-3">
               {/* Signal */}
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-20 shrink-0">Signal</span>
+              <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
+                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Signal</span>
                 <div className="flex flex-wrap gap-2">
                   {(["green", "yellow", "red"] as const).map(s => (
                     <Pill key={s} active={signals.includes(s)} onClick={() => toggle(signals, setSignals, s)}>
@@ -564,8 +564,8 @@ export default function DashboardPage() {
               </div>
 
               {/* Strategy */}
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-20 shrink-0">Strategy</span>
+              <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
+                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Strategy</span>
                 <div className="flex flex-wrap gap-2">
                   {(["flip", "rental", "both"] as const).map(s => (
                     <Pill key={s} active={strategies.includes(s)} onClick={() => toggle(strategies, setStrategies, s)}>
@@ -576,8 +576,8 @@ export default function DashboardPage() {
               </div>
 
               {/* Condition */}
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-20 shrink-0">Condition</span>
+              <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
+                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Condition</span>
                 <div className="flex flex-wrap gap-2">
                   {CONDITIONS.map(c => (
                     <Pill key={c} active={conditions.includes(c)} onClick={() => toggle(conditions, setConditions, c)}>
@@ -588,8 +588,8 @@ export default function DashboardPage() {
               </div>
 
               {/* Time */}
-              <div className="flex items-center gap-3">
-                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-20 shrink-0">Time</span>
+              <div className="flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
+                <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-full sm:w-16 shrink-0">Time</span>
                 <div className="flex flex-wrap gap-2">
                   {(["7d", "30d", "all"] as const).map(t => (
                     <Pill key={t} active={time === t} onClick={() => setTime(t)}>
@@ -600,7 +600,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Divider before sort */}
-              <div className="border-t border-white/[0.05] pt-3 flex items-center gap-3">
+              <div className="border-t border-white/[0.05] pt-3 flex flex-wrap sm:flex-nowrap items-start sm:items-center gap-2 sm:gap-3">
                 <span className="text-[10px] uppercase tracking-widest text-zinc-600 w-20 shrink-0">Sort by</span>
                 <div className="flex flex-wrap gap-2 flex-1">
                   {([

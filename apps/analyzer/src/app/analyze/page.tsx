@@ -33,7 +33,7 @@ export default function AnalyzePage() {
 
   return (
     <>
-      <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-6">
+      <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4 sm:px-6 pt-24 md:pt-0">
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-950/15 rounded-full blur-[180px]" />
         </div>

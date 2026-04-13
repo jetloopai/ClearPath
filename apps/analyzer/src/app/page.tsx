@@ -58,10 +58,10 @@ export default function Home() {
 
           {/* Headline */}
           <h1 className="mb-6">
-            <span className="block text-5xl md:text-7xl lg:text-8xl font-sans font-extralight tracking-tight text-zinc-500">
+            <span className="block text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-sans font-extralight tracking-tight text-zinc-500">
               Analyze the
             </span>
-            <span className="block text-6xl md:text-8xl lg:text-[10rem] font-serif font-bold italic text-foreground leading-none mt-2">
+            <span className="block text-4xl sm:text-6xl md:text-8xl lg:text-[10rem] font-serif font-bold italic text-foreground leading-none mt-2">
               Deal.
             </span>
           </h1>
@@ -114,7 +114,7 @@ export default function Home() {
           </div>
 
           {/* Stats strip */}
-          <div className="flex items-center justify-center gap-10 mt-10">
+          <div className="flex items-center justify-center gap-4 md:gap-10 mt-10">
             {[
               { value: "5,000+", label: "Deals Analyzed" },
               { value: "$1.8B", label: "Property Value Assessed" },
@@ -185,7 +185,7 @@ export default function Home() {
         {/* Everything Included */}
         <div className="relative z-10 w-full max-w-3xl mx-auto mt-16 mb-4">
           <div className="text-xs uppercase tracking-widest text-zinc-600 text-center mb-6">Everything included</div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {[
               { icon: BookOpen, title: "Deal Sheets", desc: "Download a 1-page PDF deal sheet for lenders and partners." },
               { icon: Share2, title: "Share Any Analysis", desc: "Send a link — anyone can view your full report, no login needed." },

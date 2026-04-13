@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { Menu, X } from "lucide-react";
 import { supabase } from "@/lib/supabase-browser";
 import { AuthModal } from "./AuthModal";
 import { UpgradeModal } from "./UpgradeModal";
@@ -18,6 +19,7 @@ export function Navbar() {
   const [showAuth, setShowAuth] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [credits, setCredits] = useState<Credits | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const fetchCredits = useCallback(async (token: string) => {
     try {
@@ -80,40 +82,54 @@ export function Navbar() {
     );
   }
 
+  const navLinks = (
+    <>
+      <Link href="/insights" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Insights</Link>
+      <Link href="/pricing" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Pricing</Link>
+      <Link href="/analyze" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Analyze Deal</Link>
+      {user ? (
+        <>
+          <CreditsChip />
+          <Link href="/dashboard" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors">My Deals</Link>
+          <button onClick={() => { handleSignOut(); setMenuOpen(false); }} className="text-sm font-medium text-zinc-500 hover:text-white transition-colors">Sign Out</button>
+        </>
+      ) : (
+        <button onClick={() => { setShowAuth(true); setMenuOpen(false); }} className="text-sm font-medium px-4 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.1] text-zinc-300 hover:bg-white/[0.1] transition-colors">
+          Sign In
+        </button>
+      )}
+    </>
+  );
+
   return (
     <>
-      <header className="fixed top-0 inset-x-0 z-50 bg-black/40 backdrop-blur-xl border-b border-white/[0.05] py-4">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between">
+      <header className="fixed top-0 inset-x-0 z-50 bg-black/40 backdrop-blur-xl border-b border-white/[0.05]">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="font-serif text-xl tracking-wide text-foreground">
             ClearPath<span className="text-indigo-400">.</span>
           </Link>
-          <div className="flex gap-6 items-center">
-            <Link href="/insights" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-              Insights
-            </Link>
-            <Link href="/pricing" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-              Pricing
-            </Link>
-            <Link href="/analyze" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-              Analyze Deal
-            </Link>
-            {user ? (
-              <>
-                <CreditsChip />
-                <Link href="/dashboard" className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
-                  My Deals
-                </Link>
-                <button onClick={handleSignOut} className="text-sm font-medium text-zinc-500 hover:text-white transition-colors">
-                  Sign Out
-                </button>
-              </>
-            ) : (
-              <button onClick={() => setShowAuth(true)} className="text-sm font-medium px-4 py-1.5 rounded-full bg-white/[0.05] border border-white/[0.1] text-zinc-300 hover:bg-white/[0.1] transition-colors">
-                Sign In
-              </button>
-            )}
+
+          {/* Desktop nav */}
+          <div className="hidden md:flex gap-6 items-center">
+            {navLinks}
           </div>
+
+          {/* Mobile hamburger */}
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            className="md:hidden p-2 text-zinc-400 hover:text-white transition-colors"
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
+
+        {/* Mobile dropdown */}
+        {menuOpen && (
+          <div className="md:hidden border-t border-white/[0.05] bg-black/80 backdrop-blur-xl px-6 py-4 flex flex-col gap-4">
+            {navLinks}
+          </div>
+        )}
       </header>
       {showAuth && createPortal(<AuthModal onClose={() => setShowAuth(false)} />, document.body)}
       {showUpgrade && createPortal(<UpgradeModal currentPlan={credits?.plan ?? 'free'} onClose={() => setShowUpgrade(false)} />, document.body)}

@@ -151,7 +151,7 @@ export default function PricingPage() {
               className={`relative glass-panel rounded-3xl p-8 border ${plan.color}`}
             >
               {plan.highlight && (
-                <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                <div className="absolute -top-3 md:-top-3.5 left-1/2 -translate-x-1/2">
                   <span className="text-[10px] font-semibold uppercase tracking-wider bg-violet-600 text-white px-3 py-1 rounded-full">
                     Most Popular
                   </span>
@@ -190,7 +190,8 @@ export default function PricingPage() {
         <div className="mb-20">
           <div className="text-xs uppercase tracking-widest text-zinc-600 text-center mb-8">Everything compared</div>
           <div className="glass-panel rounded-3xl border border-white/[0.06] overflow-hidden">
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[480px]">
               <thead>
                 <tr className="border-b border-white/[0.06]">
                   <th className="text-left p-5 text-zinc-500 font-normal text-xs">Feature</th>
@@ -210,6 +211,7 @@ export default function PricingPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
 
