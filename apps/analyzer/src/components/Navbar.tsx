@@ -85,6 +85,7 @@ export function Navbar() {
   const navLinks = (
     <>
       <Link href="/insights" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Insights</Link>
+      <Link href="/arbitrage" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Arbitrage</Link>
       <Link href="/pricing" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Pricing</Link>
       <Link href="/analyze" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Analyze Deal</Link>
       {user ? (

@@ -6,6 +6,20 @@ import { supabase } from "@/lib/supabase-browser";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Link2, FileText, StickyNote, RefreshCw } from "lucide-react";
 
+// ── Pipeline status ───────────────────────────────────────────────────────────
+
+type DealStatus = "analyzing" | "offer_made" | "under_contract" | "closed" | "dead";
+
+const STATUS_CONFIG: Record<DealStatus, { label: string; color: string; dot: string }> = {
+  analyzing:      { label: "Analyzing",       color: "bg-indigo-500/10 border-indigo-500/30 text-indigo-300",  dot: "bg-indigo-400" },
+  offer_made:     { label: "Offer Made",       color: "bg-amber-500/10  border-amber-500/30  text-amber-300",   dot: "bg-amber-400" },
+  under_contract: { label: "Under Contract",   color: "bg-sky-500/10    border-sky-500/30    text-sky-300",     dot: "bg-sky-400" },
+  closed:         { label: "Closed ✓",         color: "bg-emerald-500/10 border-emerald-500/30 text-emerald-300", dot: "bg-emerald-400" },
+  dead:           { label: "Dead",             color: "bg-zinc-500/10   border-zinc-500/30   text-zinc-500",    dot: "bg-zinc-600" },
+};
+
+const STATUS_OPTIONS: DealStatus[] = ["analyzing", "offer_made", "under_contract", "closed", "dead"];
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmt = (v: number) => {
@@ -43,6 +57,59 @@ const PROFIT_COLOR = (p: number) =>
   p >= 30000 ? "text-emerald-400" : p >= 10000 ? "text-amber-400" : "text-red-400";
 
 const CONDITIONS = ["cosmetic", "light", "medium", "heavy", "gut"] as const;
+
+// ── Status dropdown ──────────────────────────────────────────────────────────
+
+function StatusDropdown({ dealId, initial }: { dealId: string; initial: DealStatus }) {
+  const [status, setStatus] = useState<DealStatus>(initial);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSelect = async (s: DealStatus) => {
+    setStatus(s);
+    setOpen(false);
+    await supabase.from("analyses").update({ deal_status: s }).eq("id", dealId);
+  };
+
+  const cfg = STATUS_CONFIG[status];
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] border transition-all ${cfg.color}`}
+      >
+        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+        {cfg.label}
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute top-full mt-1.5 left-0 z-20 glass-panel rounded-xl border border-white/[0.08] py-1 min-w-[160px] shadow-xl">
+          {STATUS_OPTIONS.map(s => {
+            const c = STATUS_CONFIG[s];
+            return (
+              <button
+                key={s}
+                onClick={() => handleSelect(s)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-[11px] hover:bg-white/[0.04] transition-colors ${s === status ? "text-white" : "text-zinc-400"}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+                {c.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Filter pill ───────────────────────────────────────────────────────────────
 
@@ -185,11 +252,15 @@ function AddressCard({
       <div className="px-6 pt-5 pb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className={`w-2 h-2 rounded-full shrink-0 ${SIGNAL_DOT[topSignal]}`} />
               <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${SIGNAL_PILL[topSignal]}`}>
                 {SIGNAL_LABEL[topSignal]}
               </span>
+              <StatusDropdown
+                dealId={best.id}
+                initial={(best.deal_status as DealStatus) ?? "analyzing"}
+              />
               {scenarios.length > 1 && (
                 <span className="text-[10px] text-zinc-600">{scenarios.length} scenarios</span>
               )}
@@ -498,6 +569,15 @@ export default function DashboardPage() {
     return best?.[1] > 0 ? best[0] : null;
   })();
 
+  // ── Portfolio aggregates ───────────────────────────────────────────────────
+  const greenDeals  = deals.filter(d => d.deal_signal === "green").length;
+  const activePipeline = deals.filter(d =>
+    d.deal_status && d.deal_status !== "dead" && d.deal_status !== "closed"
+  ).length;
+  const closedDeals = deals.filter(d => d.deal_status === "closed").length;
+  const totalProjectedFlip = deals.reduce((s, d) => s + Math.max(0, d.flip_profit ?? 0), 0);
+  const totalProjectedCashFlow = deals.reduce((s, d) => s + (d.monthly_cash_flow ?? 0), 0);
+
   const toggle = <T extends string>(
     list: T[], setList: (v: T[]) => void, val: T
   ) => setList(list.includes(val) ? list.filter(x => x !== val) : [...list, val]);
@@ -541,6 +621,26 @@ export default function DashboardPage() {
                   <div className="text-xl font-serif text-zinc-200">{s.value}</div>
                 </div>
               ))}
+            </div>
+
+            {/* Portfolio overview */}
+            <div className="glass-panel rounded-2xl border border-white/[0.04] px-5 py-4 mb-5">
+              <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-3">Portfolio Overview</div>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-4 text-center">
+                {[
+                  { label: "Green Deals",         value: `${greenDeals}`,                        note: `of ${deals.length}` },
+                  { label: "Active Pipeline",      value: `${activePipeline}`,                    note: "not closed/dead" },
+                  { label: "Closed Deals",         value: `${closedDeals}`,                       note: "from pipeline" },
+                  { label: "Total Flip Upside",    value: totalProjectedFlip > 0 ? fmt(totalProjectedFlip) : "—",   note: "projected" },
+                  { label: "Total Monthly CF",     value: `${totalProjectedCashFlow >= 0 ? "+" : ""}${fmt(totalProjectedCashFlow)}/mo`, note: "if all held" },
+                ].map(s => (
+                  <div key={s.label}>
+                    <div className="text-base font-serif text-zinc-200">{s.value}</div>
+                    <div className="text-[10px] text-zinc-600 mt-0.5 uppercase tracking-widest">{s.label}</div>
+                    <div className="text-[10px] text-zinc-700 mt-0.5">{s.note}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Search */}

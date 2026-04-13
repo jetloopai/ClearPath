@@ -162,6 +162,25 @@ export default function ResultsView() {
   const [targetProfit, setTargetProfit] = useState("");
   const [altOverride, setAltOverride] = useState<AlternativeCondition | null>(null);
 
+  // ── Rehab line-item state ─────────────────────────────────────────────────────
+  const [showLineItems, setShowLineItems] = useState(false);
+  type LineItem = { id: string; label: string; cost: string };
+  const DEFAULT_LINE_ITEMS: LineItem[] = [
+    { id: "roof",       label: "Roof",            cost: "" },
+    { id: "hvac",       label: "HVAC",            cost: "" },
+    { id: "kitchen",    label: "Kitchen",         cost: "" },
+    { id: "bathrooms",  label: "Bathrooms",       cost: "" },
+    { id: "flooring",   label: "Flooring",        cost: "" },
+    { id: "electrical", label: "Electrical",      cost: "" },
+    { id: "plumbing",   label: "Plumbing",        cost: "" },
+    { id: "windows",    label: "Windows/Doors",   cost: "" },
+    { id: "paint",      label: "Paint/Drywall",   cost: "" },
+    { id: "exterior",   label: "Exterior/Landscaping", cost: "" },
+    { id: "other",      label: "Other",           cost: "" },
+  ];
+  const [lineItems, setLineItems] = useState<LineItem[]>(DEFAULT_LINE_ITEMS);
+  const lineItemTotal = lineItems.reduce((s, li) => s + (parseInt(li.cost.replace(/[^0-9]/g, ""), 10) || 0), 0);
+
   // ── Rehab editor state ────────────────────────────────────────────────────────
   const [customRehab, setCustomRehab] = useState(0);
   const [isRehabEditing, setIsRehabEditing] = useState(false);
@@ -195,6 +214,22 @@ export default function ResultsView() {
     low: "text-zinc-400 border-white/[0.08] bg-white/[0.03]",
   };
 
+  // ── Neighborhood data state ───────────────────────────────────────────────────
+  const [neighborhoodData, setNeighborhoodData] = useState<{
+    zip: string; hasData: boolean; count: number;
+    avgArv?: number; avgFlip?: number; avgCashFlow?: number; greenPct?: number;
+  } | null>(null);
+
+  // ── STR / Airbnb analysis state ──────────────────────────────────────────────
+  const [strNightlyRate, setStrNightlyRate] = useState("");
+  const [strOccupancy, setStrOccupancy] = useState("65");
+  const [strAvgStay, setStrAvgStay] = useState("3");
+
+  // ── Hard Money Loan state ─────────────────────────────────────────────────────
+  const [hmlRate, setHmlRate] = useState("12");
+  const [hmlPoints, setHmlPoints] = useState("2");
+  const [hmlLTV, setHmlLTV] = useState("90");
+
   // ── BRRRR state ───────────────────────────────────────────────────────────────
   const [refiLTV, setRefiLTV] = useState(0.75);
   const [refiLTVInput, setRefiLTVInput] = useState("75");
@@ -222,6 +257,15 @@ export default function ResultsView() {
     }
     setAnalysis(data);
     trackEvent('analysis_completed', { address: data.address, signal: data.results.signal, arv: data.results.arv });
+
+    // Fetch neighborhood data from ZIP in address
+    const zipMatch = data.address.match(/\b(\d{5})\b/);
+    if (zipMatch) {
+      fetch(`/api/neighborhood?zip=${zipMatch[1]}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(nd => { if (nd) setNeighborhoodData(nd); })
+        .catch(() => {});
+    }
 
     // Init rehab state
     setCustomRehab(data.results.rehabEstimate);
@@ -634,6 +678,43 @@ export default function ResultsView() {
     cashLeftInDeal <= 0 ? "green" :
     cashLeftInDeal <= allInCost * 0.2 ? "yellow" : "red";
 
+  // ── Hard Money Loan derived calculations ──────────────────────────────────────
+  const holdMonths = breakdown?.holdingCosts ? Math.max(1, Math.round(breakdown.holdingCosts / (price * 0.01))) : 6;
+  const hmlRateNum = Math.max(0, Math.min(30, parseFloat(hmlRate) || 12)) / 100;
+  const hmlPointsNum = Math.max(0, Math.min(10, parseFloat(hmlPoints) || 2)) / 100;
+  const hmlLTVNum = Math.max(50, Math.min(100, parseFloat(hmlLTV) || 90)) / 100;
+  const hmlLoan = Math.round(price * hmlLTVNum);
+  const hmlDownRequired = price - hmlLoan;
+  const hmlMonthlyPayment = Math.round(hmlLoan * hmlRateNum / 12);
+  const hmlPointsFee = Math.round(hmlLoan * hmlPointsNum);
+  const hmlTotalInterest = hmlMonthlyPayment * holdMonths;
+  const hmlFlipProfit = Math.round(
+    results.arv - price - customRehab -
+    (breakdown?.sellingCosts ?? results.arv * 0.08) -
+    hmlTotalInterest - hmlPointsFee
+  );
+  const hmlCashNeeded = hmlDownRequired + hmlPointsFee + customRehab + (breakdown?.closingCostsBuy ?? Math.round(price * 0.02));
+  const hmlFlipROI = hmlCashNeeded > 0 ? Math.round((hmlFlipProfit / hmlCashNeeded) * 1000) / 10 : 0;
+  const hmlFlipSignal: "green" | "yellow" | "red" = hmlFlipProfit >= 30000 ? "green" : hmlFlipProfit < 10000 ? "red" : "yellow";
+  const convCashNeeded = (breakdown?.downPayment ?? Math.round(price * 0.25)) + customRehab + (breakdown?.closingCostsBuy ?? Math.round(price * 0.02));
+  const convFlipROI = convCashNeeded > 0 ? Math.round((derivedFlipProfit / convCashNeeded) * 1000) / 10 : 0;
+
+  // ── STR / Airbnb derived calculations ────────────────────────────────────────
+  const defaultNightlyRate = Math.round(results.rentEstimate * 2.5 / 30);
+  const effectiveNightlyRate = strNightlyRate ? (parseFloat(strNightlyRate) || defaultNightlyRate) : defaultNightlyRate;
+  const strOccPct = Math.max(10, Math.min(100, parseFloat(strOccupancy) || 65)) / 100;
+  const strStay = Math.max(1, Math.min(30, parseFloat(strAvgStay) || 3));
+  const strGrossMonthly = Math.round(effectiveNightlyRate * 30 * strOccPct);
+  const strPlatformFee = Math.round(strGrossMonthly * 0.03);
+  const strTurnovers = Math.max(1, Math.round((30 * strOccPct) / strStay));
+  const strCleaningCost = strTurnovers * 100;
+  const strNetIncome = strGrossMonthly - strPlatformFee - strCleaningCost;
+  const strExpenses = (breakdown?.mortgage ?? 0) + (breakdown?.insurance ?? 0) + (breakdown?.taxes ?? 0);
+  const strCashFlow = strNetIncome - strExpenses;
+  const strCashFlowSignal: "green" | "yellow" | "red" = strCashFlow >= 500 ? "green" : strCashFlow >= 0 ? "yellow" : "red";
+  const strVsLtr = strCashFlow - results.monthlyCashFlow;
+  const strAnnualNet = strNetIncome * 12;
+
   // Slider range: 50% of low → 150% of high, snapping to $1K
   const sliderMin = Math.max(0, Math.round(results.rehabLow * 0.5 / 1000) * 1000);
   const sliderMax = Math.round(results.rehabHigh * 1.5 / 1000) * 1000;
@@ -945,6 +1026,55 @@ export default function ResultsView() {
             </div>
           </div>
 
+          {/* Line-item scope builder */}
+          <div className="mt-5 pt-5 border-t border-white/[0.05]">
+            <button
+              onClick={() => setShowLineItems(o => !o)}
+              className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showLineItems ? "rotate-180" : ""}`} />
+              {showLineItems ? "Hide" : "Build"} line-item scope
+              {lineItemTotal > 0 && (
+                <span className="ml-1 text-indigo-400 font-medium">(total: {fmtShort(lineItemTotal)})</span>
+              )}
+            </button>
+            {showLineItems && (
+              <div className="mt-3 space-y-2">
+                {lineItems.map((li, idx) => (
+                  <div key={li.id} className="flex items-center gap-3">
+                    <span className="text-xs text-zinc-500 w-32 shrink-0">{li.label}</span>
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 text-xs">$</span>
+                      <input
+                        type="text"
+                        value={li.cost}
+                        onChange={e => {
+                          const raw = e.target.value.replace(/[^0-9]/g, "");
+                          const formatted = raw ? Number(raw).toLocaleString("en-US") : "";
+                          setLineItems(prev => prev.map((l, i) => i === idx ? { ...l, cost: formatted } : l));
+                        }}
+                        placeholder="0"
+                        className="w-full bg-white/[0.02] border border-white/[0.06] rounded-lg py-1.5 pl-7 pr-3 text-xs text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-indigo-500/30 transition-colors"
+                      />
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between pt-2 border-t border-white/[0.05]">
+                  <span className="text-xs text-zinc-400 font-medium">Line-item total</span>
+                  <span className="text-sm font-serif text-zinc-200 font-medium">{fmt(lineItemTotal)}</span>
+                </div>
+                {lineItemTotal > 0 && (
+                  <button
+                    onClick={() => { setCustomRehab(lineItemTotal); setRehabInputValue(String(lineItemTotal)); setIsRehabEditing(false); }}
+                    className="w-full py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-xs text-indigo-300 hover:bg-indigo-500/20 transition-colors"
+                  >
+                    Apply {fmt(lineItemTotal)} to analysis →
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
           <span className="inline-block mt-4 text-xs px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 capitalize">
             {displayCondition}
           </span>
@@ -1253,6 +1383,59 @@ export default function ResultsView() {
             </div>
           )}
 
+          {/* ── Multi-family rent roll (2–4 units) ── */}
+          {units > 1 && state === "unlocked" && breakdown && (
+            <div className="revealed-card glass-panel rounded-[2rem] p-8 mb-6">
+              <div className="text-xs uppercase tracking-widest text-zinc-500 mb-6">{units}-Unit Rent Roll</div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/[0.06]">
+                      <th className="text-left py-2 px-3 text-[10px] uppercase tracking-widest text-zinc-600 font-normal">Unit</th>
+                      <th className="text-right py-2 px-3 text-[10px] uppercase tracking-widest text-zinc-600 font-normal">Est. Rent</th>
+                      <th className="text-right py-2 px-3 text-[10px] uppercase tracking-widest text-zinc-600 font-normal">Vacancy (8%)</th>
+                      <th className="text-right py-2 px-3 text-[10px] uppercase tracking-widest text-zinc-600 font-normal">Effective</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04]">
+                    {Array.from({ length: units }, (_, i) => {
+                      const unitRent = results.rentPerUnit;
+                      const vacancy = Math.round(unitRent * 0.08);
+                      const effective = unitRent - vacancy;
+                      return (
+                        <tr key={i}>
+                          <td className="py-2.5 px-3 text-zinc-400">Unit {i + 1}</td>
+                          <td className="py-2.5 px-3 text-right text-zinc-300">{fmt(unitRent)}</td>
+                          <td className="py-2.5 px-3 text-right text-zinc-500">− {fmt(vacancy)}</td>
+                          <td className="py-2.5 px-3 text-right text-emerald-400 font-medium">{fmt(effective)}</td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="border-t border-white/[0.08]">
+                      <td className="py-2.5 px-3 text-zinc-300 font-medium">Total</td>
+                      <td className="py-2.5 px-3 text-right text-zinc-300 font-medium">{fmt(results.rentEstimate)}</td>
+                      <td className="py-2.5 px-3 text-right text-zinc-500">− {fmt(Math.round(results.rentEstimate * 0.08))}</td>
+                      <td className="py-2.5 px-3 text-right text-emerald-400 font-bold font-serif">{fmt(Math.round(results.rentEstimate * 0.92))}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                  { label: "Gross Rent", value: fmt(results.rentEstimate) + "/mo" },
+                  { label: "Per Unit", value: fmt(results.rentPerUnit) + "/unit" },
+                  { label: "Cap Rate", value: `${Math.round(((results.rentEstimate - monthlyExpenses) * 12 / results.arv) * 1000) / 10}%` },
+                  { label: "GRM", value: `${Math.round(results.arv / (results.rentEstimate * 12) * 10) / 10}x` },
+                ].map(s => (
+                  <div key={s.label} className="glass-panel rounded-xl p-3 text-center border border-white/[0.04]">
+                    <div className="text-[10px] text-zinc-600 mb-1 uppercase tracking-widest">{s.label}</div>
+                    <div className="text-sm font-serif text-zinc-200">{s.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* ── Section 4: Rental P&L ── */}
           {breakdown && (
             <div className={`${state === "unlocked" ? "revealed-card" : ""} glass-panel rounded-[2rem] p-8 mb-6`}>
@@ -1396,7 +1579,141 @@ export default function ResultsView() {
             </div>
           )}
 
-          {/* ── Section 5: BRRRR Refinance Analysis ── */}
+          {/* ── Section 5: Short-Term Rental / Airbnb Analysis ── */}
+          {state === "unlocked" && (
+            <div className="revealed-card glass-panel rounded-[2rem] p-8 mb-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="text-xs uppercase tracking-widest text-zinc-500">Short-Term Rental / Airbnb</div>
+                <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
+                  strCashFlowSignal === "green" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                  : strCashFlowSignal === "yellow" ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                  : "bg-red-500/10 border-red-500/20 text-red-400"
+                }`}>
+                  {strCashFlowSignal === "green" ? "Strong STR" : strCashFlowSignal === "yellow" ? "Marginal STR" : "Weak STR"}
+                </span>
+              </div>
+
+              {/* Inputs */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.04]">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-600 mb-2 block">Nightly Rate</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">$</span>
+                    <input
+                      type="text"
+                      value={strNightlyRate}
+                      onChange={e => setStrNightlyRate(e.target.value.replace(/[^0-9]/g, ""))}
+                      placeholder={String(defaultNightlyRate)}
+                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl py-2 pl-7 pr-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/40 transition-colors"
+                    />
+                  </div>
+                  <div className="text-[10px] text-zinc-600 mt-1">Default: ~2.5× LTR/night</div>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-600 mb-2 block">Occupancy %</label>
+                  <input
+                    type="text"
+                    value={strOccupancy}
+                    onChange={e => setStrOccupancy(e.target.value.replace(/[^0-9]/g, ""))}
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-indigo-500/40 transition-colors"
+                  />
+                  <div className="text-[10px] text-zinc-600 mt-1">US avg: 55–75%</div>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-zinc-600 mb-2 block">Avg Stay (nights)</label>
+                  <input
+                    type="text"
+                    value={strAvgStay}
+                    onChange={e => setStrAvgStay(e.target.value.replace(/[^0-9]/g, ""))}
+                    className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-indigo-500/40 transition-colors"
+                  />
+                  <div className="text-[10px] text-zinc-600 mt-1">Affects cleaning cost</div>
+                </div>
+              </div>
+
+              {/* Revenue breakdown */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-3">STR Revenue</div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-500">Gross ({Math.round(strOccPct * 100)}% occ · ${effectiveNightlyRate}/night)</span>
+                      <span className="text-emerald-400 font-medium">{fmt(strGrossMonthly)}/mo</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-500">Platform fee (3%)</span>
+                      <span className="text-zinc-400">− {fmt(strPlatformFee)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-500">Cleaning ({strTurnovers} turns × $100)</span>
+                      <span className="text-zinc-400">− {fmt(strCleaningCost)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm border-t border-white/[0.05] pt-2">
+                      <span className="text-zinc-300 font-medium">Net STR Income</span>
+                      <span className="text-zinc-200 font-medium">{fmt(strNetIncome)}/mo</span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-3">Ownership Expenses</div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-500">Mortgage</span>
+                      <span className="text-zinc-400">− {fmt(breakdown?.mortgage ?? 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-500">Insurance</span>
+                      <span className="text-zinc-400">− {fmt(breakdown?.insurance ?? 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-500">Property taxes</span>
+                      <span className="text-zinc-400">− {fmt(breakdown?.taxes ?? 0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm border-t border-white/[0.05] pt-2">
+                      <span className="text-zinc-300 font-medium">STR Cash Flow</span>
+                      <span className={`font-serif font-bold text-lg ${strCashFlowSignal === "green" ? "text-emerald-400" : strCashFlowSignal === "yellow" ? "text-amber-400" : "text-red-400"}`}>
+                        {strCashFlow >= 0 ? "+" : ""}{fmt(strCashFlow)}/mo
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* STR vs LTR comparison */}
+              <div className="rounded-2xl bg-white/[0.02] border border-white/[0.04] p-5">
+                <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-4">STR vs Long-Term Rental</div>
+                <div className="grid grid-cols-3 gap-4 text-center mb-4">
+                  <div>
+                    <div className="text-[10px] text-zinc-600 mb-1">LTR Cash Flow</div>
+                    <div className={`text-base font-serif font-medium ${results.rentalSignal === "green" ? "text-emerald-400" : results.rentalSignal === "yellow" ? "text-amber-400" : "text-red-400"}`}>
+                      {results.monthlyCashFlow >= 0 ? "+" : ""}{fmt(results.monthlyCashFlow)}/mo
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-zinc-600 mb-1">STR Cash Flow</div>
+                    <div className={`text-base font-serif font-medium ${strCashFlowSignal === "green" ? "text-emerald-400" : strCashFlowSignal === "yellow" ? "text-amber-400" : "text-red-400"}`}>
+                      {strCashFlow >= 0 ? "+" : ""}{fmt(strCashFlow)}/mo
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-zinc-600 mb-1">STR Advantage</div>
+                    <div className={`text-base font-serif font-medium ${strVsLtr >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {strVsLtr >= 0 ? "+" : ""}{fmt(strVsLtr)}/mo
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-600">
+                  {strVsLtr > 200
+                    ? `STR outperforms long-term rental by ${fmt(strVsLtr * 12)}/yr at ${Math.round(strOccPct * 100)}% occupancy. Verify local STR permit requirements before committing.`
+                    : strVsLtr > 0
+                    ? `STR has a modest edge of ${fmt(strVsLtr)}/mo. May not justify the added management complexity — consider your market's STR regulations.`
+                    : `Long-term rental outperforms STR at this occupancy rate. Try raising the nightly rate or occupancy % above to find the break-even.`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Section 6: BRRRR Refinance Analysis ── */}
           <div className={`${state === "unlocked" ? "revealed-card" : ""} glass-panel rounded-[2rem] p-8 mb-6`}>
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
@@ -2001,47 +2318,62 @@ export default function ResultsView() {
         </div>
       )}
 
-      {/* Lender Matching CTA (Phase 2 Prep) */}
+      {/* ── Neighborhood Snapshot ── */}
+      {state === "unlocked" && neighborhoodData && (
+        <div className="mt-8 glass-panel rounded-[2rem] p-8 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="text-xs uppercase tracking-widest text-zinc-500">Neighborhood Snapshot</div>
+            <span className="text-xs text-zinc-600">ZIP {neighborhoodData.zip}</span>
+          </div>
+
+          {neighborhoodData.hasData && neighborhoodData.count >= 3 ? (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+                {[
+                  { label: "Avg ARV in ZIP", value: neighborhoodData.avgArv ? `$${Math.round(neighborhoodData.avgArv / 1000)}K` : "—" },
+                  { label: "Avg Flip Profit", value: neighborhoodData.avgFlip != null ? `${neighborhoodData.avgFlip >= 0 ? "+" : ""}$${Math.round(neighborhoodData.avgFlip / 1000)}K` : "—", positive: (neighborhoodData.avgFlip ?? 0) > 0 },
+                  { label: "Avg Cash Flow", value: neighborhoodData.avgCashFlow != null ? `${neighborhoodData.avgCashFlow >= 0 ? "+" : ""}$${neighborhoodData.avgCashFlow}/mo` : "—", positive: (neighborhoodData.avgCashFlow ?? 0) > 0 },
+                  { label: "Green Deal %", value: `${neighborhoodData.greenPct ?? 0}%`, positive: (neighborhoodData.greenPct ?? 0) >= 40 },
+                ].map(s => (
+                  <div key={s.label} className="glass-panel rounded-xl p-4 text-center border border-white/[0.04]">
+                    <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">{s.label}</div>
+                    <div className={`text-base font-serif font-medium ${s.positive === true ? "text-emerald-400" : s.positive === false ? "text-red-400" : "text-zinc-200"}`}>
+                      {s.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-zinc-600">
+                Based on {neighborhoodData.count} deal{neighborhoodData.count !== 1 ? "s" : ""} analyzed in ZIP {neighborhoodData.zip} by ClearPath users. No individual addresses or owner data exposed.
+                {results.arv > 0 && neighborhoodData.avgArv && Math.abs(results.arv - neighborhoodData.avgArv) > neighborhoodData.avgArv * 0.15 && (
+                  <span className="text-amber-400 ml-2">
+                    ⚠ This property&apos;s ARV ({fmt(results.arv)}) is {results.arv > neighborhoodData.avgArv ? "above" : "below"} the ZIP average — verify comps carefully.
+                  </span>
+                )}
+              </p>
+            </>
+          ) : (
+            <div className="text-center py-6">
+              <div className="text-zinc-500 text-sm mb-2">Not enough data yet for ZIP {neighborhoodData.zip}</div>
+              <p className="text-xs text-zinc-600">As more deals are analyzed in this area, neighborhood trends will appear here.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Financing Calculator ── */}
       {state === "unlocked" && (
-        <div className="mt-16 relative glass-panel rounded-[2rem] overflow-hidden">
+        <div className="mt-16 relative glass-panel rounded-[2rem] overflow-hidden mb-6">
           <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500" />
-          <div className="p-8 md:p-12 text-center">
-            <div className="text-4xl mb-4">💰</div>
-            <h3 className="text-2xl font-serif text-foreground mb-4">Need financing for this deal?</h3>
+          <div className="p-8 md:p-12">
+            <div className="text-xs uppercase tracking-widest text-zinc-500 mb-2">Financing Calculator</div>
+            <h3 className="text-xl font-serif text-foreground mb-6">How does financing affect this deal?</h3>
 
-            {(() => {
-              const downPayment = breakdown?.downPayment ?? Math.round(price * 0.25);
-              const loanNeeded = price - downPayment;
-              return (
-                <div className="max-w-md mx-auto bg-black/40 rounded-2xl p-6 border border-white/[0.05] mb-8 text-left text-sm">
-                  <div className="text-xs uppercase tracking-widest text-zinc-500 mb-4 font-semibold">Based on your analysis:</div>
-                  <ul className="space-y-3">
-                    <li className="flex justify-between">
-                      <span className="text-zinc-400">Purchase</span>
-                      <span className="text-zinc-200 font-medium">{fmt(price)}</span>
-                    </li>
-                    <li className="flex justify-between">
-                      <span className="text-zinc-400">Down payment</span>
-                      <span className="text-zinc-200 font-medium">{fmt(downPayment)} ({Math.round((downPayment / price) * 100)}%)</span>
-                    </li>
-                    <li className="flex justify-between pt-3 border-t border-white/[0.05]">
-                      <span className="text-zinc-300 font-medium">Loan needed</span>
-                      <span className="text-amber-400 font-bold font-serif text-lg">{fmt(loanNeeded)}</span>
-                    </li>
-                  </ul>
-                </div>
-              );
-            })()}
-
-            <div className="flex flex-wrap justify-center gap-3 mb-8">
-              {['Hard Money', 'DSCR Loan', 'Conventional'].map((loan) => (
+            <div className="flex flex-wrap gap-3 mb-8">
+              {(['Hard Money', 'Conventional', 'DSCR Loan'] as const).map((loan) => (
                 <button
                   key={loan}
-                  onClick={() => {
-                    setSelectedLoan(loan);
-                    const downPayment = breakdown?.downPayment ?? Math.round(price * 0.25);
-                    trackEvent('financing_interest', { loan_type: loan, loan_amount: price - downPayment });
-                  }}
+                  onClick={() => { setSelectedLoan(loan); trackEvent('financing_interest', { loan_type: loan }); }}
                   className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all border ${
                     selectedLoan === loan
                       ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
@@ -2053,12 +2385,151 @@ export default function ResultsView() {
               ))}
             </div>
 
-            <button
-              disabled
-              className="px-10 py-4 rounded-full bg-white/[0.03] border border-white/[0.05] text-zinc-500 font-medium cursor-not-allowed"
-            >
-              Get Pre-Qualified → (Coming Soon)
-            </button>
+            {selectedLoan === 'Hard Money' && (
+              <div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                  <div>
+                    <label className="text-xs text-zinc-500 mb-1 block">Interest Rate %</label>
+                    <input
+                      type="text"
+                      value={hmlRate}
+                      onChange={e => setHmlRate(e.target.value.replace(/[^0-9.]/g, ""))}
+                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-amber-500/40 transition-colors"
+                    />
+                    <div className="text-[10px] text-zinc-600 mt-1">Typical: 10–14%</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 mb-1 block">Points</label>
+                    <input
+                      type="text"
+                      value={hmlPoints}
+                      onChange={e => setHmlPoints(e.target.value.replace(/[^0-9.]/g, ""))}
+                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-amber-500/40 transition-colors"
+                    />
+                    <div className="text-[10px] text-zinc-600 mt-1">Typical: 1–3 points</div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-zinc-500 mb-1 block">LTV %</label>
+                    <input
+                      type="text"
+                      value={hmlLTV}
+                      onChange={e => setHmlLTV(e.target.value.replace(/[^0-9]/g, ""))}
+                      className="w-full bg-white/[0.03] border border-white/[0.07] rounded-xl py-2 px-3 text-sm text-white focus:outline-none focus:border-amber-500/40 transition-colors"
+                    />
+                    <div className="text-[10px] text-zinc-600 mt-1">Typical: 70–90%</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                  {/* HML column */}
+                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="text-xs uppercase tracking-widest text-amber-400">Hard Money</div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                        hmlFlipSignal === 'green' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                        hmlFlipSignal === 'yellow' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+                        'bg-red-500/10 border-red-500/20 text-red-400'
+                      }`}>{hmlFlipSignal === 'green' ? 'Strong' : hmlFlipSignal === 'yellow' ? 'Marginal' : 'Weak'}</span>
+                    </div>
+                    <div className="space-y-2.5 text-sm">
+                      <div className="flex justify-between"><span className="text-zinc-500">Loan amount</span><span className="text-zinc-200">{fmt(hmlLoan)} ({hmlLTV}%)</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500">Down required</span><span className="text-zinc-200">{fmt(hmlDownRequired)}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500">Monthly payment</span><span className="text-zinc-200">{fmt(hmlMonthlyPayment)}/mo (I/O)</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500">Points fee</span><span className="text-zinc-200">{fmt(hmlPointsFee)}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500">Total interest ({holdMonths}mo hold)</span><span className="text-zinc-200">{fmt(hmlTotalInterest)}</span></div>
+                      <div className="flex justify-between border-t border-white/[0.05] pt-2.5"><span className="text-zinc-400">Cash needed at close</span><span className="text-zinc-200 font-medium">{fmt(hmlCashNeeded)}</span></div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400 font-medium">Flip profit</span>
+                        <span className={`font-serif font-bold text-lg ${hmlFlipSignal === 'green' ? 'text-emerald-400' : hmlFlipSignal === 'yellow' ? 'text-amber-400' : 'text-red-400'}`}>
+                          {hmlFlipProfit >= 0 ? '+' : ''}{fmt(hmlFlipProfit)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between"><span className="text-zinc-500">ROI on cash</span><span className="text-zinc-300">{hmlFlipROI}%</span></div>
+                    </div>
+                  </div>
+
+                  {/* Conventional column */}
+                  <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="text-xs uppercase tracking-widest text-indigo-400">Conventional</div>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                        derivedFlipSignal === 'green' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                        derivedFlipSignal === 'yellow' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+                        'bg-red-500/10 border-red-500/20 text-red-400'
+                      }`}>{derivedFlipSignal === 'green' ? 'Strong' : derivedFlipSignal === 'yellow' ? 'Marginal' : 'Weak'}</span>
+                    </div>
+                    <div className="space-y-2.5 text-sm">
+                      <div className="flex justify-between"><span className="text-zinc-500">Loan amount</span><span className="text-zinc-200">{fmt(price - (breakdown?.downPayment ?? Math.round(price * 0.25)))} ({100 - Math.round(((breakdown?.downPayment ?? Math.round(price * 0.25)) / price) * 100)}%)</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500">Down required</span><span className="text-zinc-200">{fmt(breakdown?.downPayment ?? Math.round(price * 0.25))}</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500">Monthly payment</span><span className="text-zinc-200">{fmt(breakdown?.mortgage ?? 0)}/mo (P&amp;I)</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500">Points fee</span><span className="text-zinc-200">$0</span></div>
+                      <div className="flex justify-between"><span className="text-zinc-500">Holding costs ({holdMonths}mo hold)</span><span className="text-zinc-200">{fmt(breakdown?.holdingCosts ?? 0)}</span></div>
+                      <div className="flex justify-between border-t border-white/[0.05] pt-2.5"><span className="text-zinc-400">Cash needed at close</span><span className="text-zinc-200 font-medium">{fmt(convCashNeeded)}</span></div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400 font-medium">Flip profit</span>
+                        <span className={`font-serif font-bold text-lg ${derivedFlipSignal === 'green' ? 'text-emerald-400' : derivedFlipSignal === 'yellow' ? 'text-amber-400' : 'text-red-400'}`}>
+                          {derivedFlipProfit >= 0 ? '+' : ''}{fmt(derivedFlipProfit)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between"><span className="text-zinc-500">ROI on cash</span><span className="text-zinc-300">{convFlipROI}%</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white/[0.02] border border-white/[0.05] p-4 text-xs text-zinc-500">
+                  <span className="text-zinc-400 font-medium">HML vs Conventional: </span>
+                  {hmlFlipProfit > derivedFlipProfit
+                    ? `Hard money produces ${fmt(hmlFlipProfit - derivedFlipProfit)} more profit — you tie up ${fmt(convCashNeeded - hmlCashNeeded)} less cash at close, freeing capital for the next deal.`
+                    : `Conventional financing saves ${fmt(derivedFlipProfit - hmlFlipProfit)} in profit vs hard money. HML makes sense if capital is constrained or you need to close fast.`}
+                </div>
+              </div>
+            )}
+
+            {selectedLoan === 'Conventional' && (
+              <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-6">
+                <div className="text-xs uppercase tracking-widest text-indigo-400 mb-4">Conventional Financing</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-5 text-sm">
+                  <div><div className="text-[10px] text-zinc-600 mb-1">Loan Amount</div><div className="text-zinc-200 font-medium font-serif">{fmt(price - (breakdown?.downPayment ?? Math.round(price * 0.25)))}</div></div>
+                  <div><div className="text-[10px] text-zinc-600 mb-1">Down Payment</div><div className="text-zinc-200 font-medium font-serif">{fmt(breakdown?.downPayment ?? Math.round(price * 0.25))}</div></div>
+                  <div><div className="text-[10px] text-zinc-600 mb-1">Monthly P&amp;I</div><div className="text-zinc-200 font-medium font-serif">{fmt(breakdown?.mortgage ?? 0)}/mo</div></div>
+                  <div><div className="text-[10px] text-zinc-600 mb-1">Holding Costs</div><div className="text-zinc-200 font-medium font-serif">{fmt(breakdown?.holdingCosts ?? 0)}</div></div>
+                  <div><div className="text-[10px] text-zinc-600 mb-1">Cash Needed</div><div className="text-zinc-200 font-medium font-serif">{fmt(convCashNeeded)}</div></div>
+                  <div><div className="text-[10px] text-zinc-600 mb-1">Flip Profit</div>
+                    <div className={`font-serif font-bold text-lg ${derivedFlipSignal === 'green' ? 'text-emerald-400' : derivedFlipSignal === 'yellow' ? 'text-amber-400' : 'text-red-400'}`}>
+                      {derivedFlipProfit >= 0 ? '+' : ''}{fmt(derivedFlipProfit)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedLoan === 'DSCR Loan' && (
+              <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-6">
+                <div className="text-xs uppercase tracking-widest text-violet-400 mb-2">DSCR Loan — Rental Analysis</div>
+                <p className="text-xs text-zinc-500 mb-5">DSCR loans qualify on property income, not personal income. Full refi analysis is in the BRRRR section above.</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-5 text-sm">
+                  <div><div className="text-[10px] text-zinc-600 mb-1">Monthly Rent</div><div className="text-zinc-200 font-medium font-serif">{fmt(results.rentEstimate)}/mo</div></div>
+                  <div><div className="text-[10px] text-zinc-600 mb-1">Monthly Expenses</div><div className="text-zinc-200 font-medium font-serif">{fmt(monthlyExpenses)}/mo</div></div>
+                  <div><div className="text-[10px] text-zinc-600 mb-1">Annual NOI</div><div className="text-zinc-200 font-medium font-serif">{fmt(annualNOI)}</div></div>
+                  <div>
+                    <div className="text-[10px] text-zinc-600 mb-1">DSCR</div>
+                    <div className={`font-serif font-bold text-lg ${dscr >= 1.25 ? 'text-emerald-400' : dscr >= 1.0 ? 'text-amber-400' : 'text-red-400'}`}>{dscr.toFixed(2)}x</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-zinc-600 mb-1">Lender Readiness</div>
+                    <div className={`text-xs font-medium ${dscr >= 1.25 ? 'text-emerald-400' : dscr >= 1.0 ? 'text-amber-400' : 'text-red-400'}`}>
+                      {dscr >= 1.25 ? 'Strong — qualifies easily' : dscr >= 1.0 ? 'Marginal — some lenders' : 'Below threshold'}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-zinc-600 mb-1">Cash Flow</div>
+                    <div className={`font-serif font-bold text-lg ${results.rentalSignal === 'green' ? 'text-emerald-400' : results.rentalSignal === 'yellow' ? 'text-amber-400' : 'text-red-400'}`}>
+                      {results.monthlyCashFlow >= 0 ? '+' : ''}{fmt(results.monthlyCashFlow)}/mo
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
