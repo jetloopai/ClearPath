@@ -331,7 +331,8 @@ export async function POST(req: NextRequest) {
     .update({ credits_remaining: creditsRemaining - 1, updated_at: new Date().toISOString() })
     .eq('id', authUser.id)
     .gt('credits_remaining', 0)  // only succeeds if credit still available
-  if (decrementError || !decrementCount) {
+    .select('id', { count: 'exact', head: true })
+  if (decrementError || decrementCount === 0) {
     return NextResponse.json({ error: 'upgrade_required', plan: currentPlan }, { status: 402 })
   }
   // ─────────────────────────────────────────────────────────────────────────
