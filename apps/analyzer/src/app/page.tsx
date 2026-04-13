@@ -81,7 +81,7 @@ export default function Home() {
               />
               <button
                 type="submit"
-                className="hidden sm:block absolute right-3 px-6 py-2.5 text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors rounded-full hover:bg-white/[0.04]"
+                className="hidden sm:block absolute right-3 px-6 py-2.5 text-base font-medium text-indigo-400 hover:text-indigo-300 transition-colors rounded-full hover:bg-white/[0.04]"
               >
                 Analyze Deal →
               </button>
