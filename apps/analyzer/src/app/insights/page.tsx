@@ -2,7 +2,7 @@ import React from 'react';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import InsightsClient, { type ZipRow } from './InsightsClient';
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'ClearPath Insights | Market Intelligence',
