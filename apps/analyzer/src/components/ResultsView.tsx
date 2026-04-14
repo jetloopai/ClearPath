@@ -55,6 +55,10 @@ interface StoredAnalysis {
     sqftSource: "property_api" | "manual" | "missing" | "stub";
     subjectSqft: number | null;
     effectiveSqft: number;
+    bedrooms: number | null;
+    bathrooms: number | null;
+    yearBuilt: number | null;
+    propertyType: string | null;
     label: string;
     summary: string;
   };
@@ -836,9 +840,18 @@ export default function ResultsView() {
         <div className="glass-panel rounded-2xl p-4">
           <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">Subject Facts</div>
           <div className="text-sm text-zinc-200">{subjectData?.label ?? "Property details"}</div>
-          <p className="text-xs text-zinc-500 mt-2">
-            {subjectData ? `${subjectData.effectiveSqft.toLocaleString()} sq ft used in the analysis.` : "Subject data source unavailable."}
-          </p>
+          {subjectData ? (
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              <span className="text-xs text-zinc-400">{subjectData.effectiveSqft.toLocaleString()} sq ft</span>
+              {subjectData.bedrooms != null && <span className="text-xs text-zinc-400">{subjectData.bedrooms} bed</span>}
+              {subjectData.bathrooms != null && <span className="text-xs text-zinc-400">{subjectData.bathrooms} bath</span>}
+              {subjectData.yearBuilt ? <span className="text-xs text-zinc-500">built {subjectData.yearBuilt}</span> : null}
+              {subjectData.propertyType ? <span className="text-xs text-zinc-600 capitalize">{subjectData.propertyType.toLowerCase().replace(/_/g, ' ')}</span> : null}
+            </div>
+          ) : (
+            <p className="text-xs text-zinc-500 mt-2">Subject data source unavailable.</p>
+          )}
+          <p className="text-xs text-zinc-600 mt-1.5">{subjectData?.summary}</p>
         </div>
       </div>
 

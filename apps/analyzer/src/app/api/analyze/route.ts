@@ -38,6 +38,10 @@ export interface SubjectDataProvenance {
   sqftSource: 'property_api' | 'manual' | 'missing' | 'stub'
   subjectSqft: number | null
   effectiveSqft: number
+  bedrooms: number | null
+  bathrooms: number | null
+  yearBuilt: number | null
+  propertyType: string | null
   label: string
   summary: string
 }
@@ -133,6 +137,12 @@ function getSqftVerificationIssue(property: PropertyData, effectiveSqft: number,
 
 function buildSubjectDataProvenance(property: PropertyData, manualSqft: number | null, effectiveSqft: number, manualSqftReason: ManualSqftReason): SubjectDataProvenance {
   const subjectProvider = property.subjectProvider ? getProviderLabel(property.subjectProvider) : null
+  const sharedFacts = {
+    bedrooms: property.bedrooms ?? null,
+    bathrooms: property.bathrooms ?? null,
+    yearBuilt: property.yearBuilt ?? null,
+    propertyType: property.propertyType ?? null,
+  }
 
   if (property.isStubData) {
     return {
@@ -142,6 +152,7 @@ function buildSubjectDataProvenance(property: PropertyData, manualSqft: number |
       sqftSource: manualSqft ? 'manual' : 'stub',
       subjectSqft: property.sqft,
       effectiveSqft,
+      ...sharedFacts,
       label: manualSqft ? 'Manual sqft on fallback lookup' : 'Fallback property data',
       summary: manualSqft
         ? `Provider lookup failed, so ClearPath used your manual sqft of ${effectiveSqft.toLocaleString()} sq ft with fallback market data.`
@@ -157,6 +168,7 @@ function buildSubjectDataProvenance(property: PropertyData, manualSqft: number |
       sqftSource: 'manual',
       subjectSqft: property.sqft,
       effectiveSqft,
+      ...sharedFacts,
       label: 'Manual square footage',
       summary: manualSqftReason === 'unverified'
         ? `${subjectProvider ?? 'The provider'} returned square footage that looked unreliable against nearby comps, so ClearPath used your manual sqft of ${effectiveSqft.toLocaleString()} sq ft.`
@@ -171,6 +183,7 @@ function buildSubjectDataProvenance(property: PropertyData, manualSqft: number |
     sqftSource: property.sqftSource,
     subjectSqft: property.sqft,
     effectiveSqft,
+    ...sharedFacts,
     label: subjectProvider ? `${subjectProvider} property data` : 'Property data provider',
     summary: `Subject facts came from ${subjectProvider ?? 'the provider'}, including ${effectiveSqft.toLocaleString()} sq ft.`,
   }
