@@ -184,8 +184,8 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
               <table className="w-full text-sm text-left">
                 <thead className="bg-white/[0.02] border-b border-white/[0.05]">
                   <tr>
-                    <th className="sticky left-0 z-10 bg-[#0a0a0a] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider w-12">Rank</th>
-                    <th className="sticky left-12 z-10 bg-[#0a0a0a] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider min-w-[180px]">Neighborhood / ZIP</th>
+                    <th className="sticky left-0 z-10 bg-[#050505] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider w-12">Rank</th>
+                    <th className="sticky left-12 z-10 bg-[#050505] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider min-w-[180px] shadow-[2px_0_8px_rgba(0,0,0,0.6)]">Neighborhood / ZIP</th>
                     <th className="py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-center">Activity</th>
                     <th className="py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-right">Avg ARV</th>
                     <th className="py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-right">Avg Flip</th>
@@ -202,12 +202,12 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
 
                     return (
                       <tr key={`${item.zip}-${i}`} className="hover:bg-white/[0.02] transition-colors group">
-                        <td className="sticky left-0 z-10 bg-[#0a0a0a] group-hover:bg-zinc-900/80 py-4 px-5 w-12 transition-colors">
+                        <td className="sticky left-0 z-10 bg-[#050505] py-4 px-5 w-12">
                           <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/[0.05] text-[10px] font-medium text-zinc-500">
                             {i + 1}
                           </span>
                         </td>
-                        <td className="sticky left-12 z-10 bg-[#0a0a0a] group-hover:bg-zinc-900/80 py-4 px-5 min-w-[180px] transition-colors">
+                        <td className="sticky left-12 z-10 bg-[#050505] py-4 px-5 min-w-[180px] shadow-[2px_0_8px_rgba(0,0,0,0.6)]">
                           <div className="text-zinc-200 font-medium">
                             {item.city !== "Unknown" ? item.city : `ZIP ${item.zip}`}
                           </div>
