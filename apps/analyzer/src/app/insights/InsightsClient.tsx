@@ -65,7 +65,7 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
     return Object.values(cityAgg)
       .map(c => ({ ...c, avg_arv: Math.round(c.arvSum / c.count), avg_profit: Math.round(c.profitSum / c.count) }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .slice(0, 10);
   }, [filtered]);
 
   const totalFiltered = filtered.reduce((s, r) => s + r.count, 0);
@@ -194,7 +194,7 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.03]">
-                  {filtered.slice(0, 20).map((item, i) => {
+                  {filtered.slice(0, 100).map((item, i) => {
                     const profitColor = item.avg_profit >= 30000 ? "text-emerald-400" : item.avg_profit >= 10000 ? "text-amber-400" : "text-red-400";
                     const cfColor = item.avg_cash_flow >= 300 ? "text-emerald-400" : item.avg_cash_flow >= 0 ? "text-amber-400" : "text-red-400";
                     const greenPct = Math.round((item.greenCount / item.count) * 100);
