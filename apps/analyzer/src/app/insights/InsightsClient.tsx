@@ -179,126 +179,78 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
             <p className="text-zinc-400">No data for this filter yet.</p>
           </div>
         ) : (
-          <>
-            {/* ── Mobile: Airtable-style card rows ── */}
-            <div className="-mx-6 md:hidden border-t border-white/[0.05] bg-[#0d0d0d]">
-              {filtered.slice(0, 100).map((item, i) => {
-                const profitColor = item.avg_profit >= 30000 ? "text-emerald-400" : item.avg_profit >= 10000 ? "text-amber-400" : "text-red-400";
-                const cfColor = item.avg_cash_flow >= 300 ? "text-emerald-400" : item.avg_cash_flow >= 0 ? "text-amber-400" : "text-red-400";
-                const greenPct = Math.round((item.greenCount / item.count) * 100);
-                const redPct = Math.round((item.redCount / item.count) * 100);
-                return (
-                  <div key={`m-${item.zip}-${i}`} className="border-b border-white/[0.04]">
-                    {/* Record name row — full width, always visible */}
-                    <div className="flex items-center gap-2.5 px-4 pt-3 pb-1">
-                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-white/[0.05] text-[9px] font-medium text-zinc-600 flex items-center justify-center">{i + 1}</span>
-                      <div>
-                        <div className="text-zinc-200 text-sm font-medium leading-tight">{item.city !== "Unknown" ? item.city : `ZIP ${item.zip}`}</div>
-                        <div className="text-[10px] text-zinc-600">{item.zip} · {item.state}{item.county ? ` · ${item.county}` : ""}</div>
-                      </div>
-                    </div>
-                    {/* Scrollable metrics strip */}
-                    <div className="overflow-x-auto pb-3">
-                      <div className="flex gap-px px-4 min-w-max">
-                        {[
-                          { label: "Activity", value: <span className="text-indigo-400 font-medium">{item.count}</span> },
-                          { label: "Avg ARV", value: <span className="text-zinc-300">{fmt(item.avg_arv)}</span> },
-                          { label: "Avg Flip", value: <span className={profitColor + " font-medium"}>{item.avg_profit >= 0 ? "+" : ""}{fmt(item.avg_profit)}</span> },
-                          { label: "Cash Flow", value: <span className={cfColor + " font-medium"}>{fmtCash(item.avg_cash_flow)}</span> },
-                          { label: "Quality", value: (
-                            <div className="flex items-center gap-1">
-                              <div className="w-12 h-1.5 rounded-full overflow-hidden bg-white/[0.05] flex">
-                                <div className="bg-emerald-500/70 h-full" style={{ width: `${greenPct}%` }} />
-                                <div className="bg-amber-500/70 h-full" style={{ width: `${100 - greenPct - redPct}%` }} />
-                                <div className="bg-red-500/70 h-full" style={{ width: `${redPct}%` }} />
-                              </div>
-                              <span className="text-[9px] text-zinc-500">{greenPct}%</span>
+          <div className="-mx-6 md:mx-0 md:rounded-3xl overflow-hidden border-y md:border border-white/[0.05] bg-[#0d0d0d]">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead>
+                  <tr className="border-b border-white/[0.05]">
+                    {/* Top-left corner: sticky both left AND top */}
+                    <th className="sticky left-0 top-[65px] z-30 bg-[#0d0d0d] py-3 px-4 md:py-4 md:px-5 font-medium text-[10px] text-zinc-500 uppercase tracking-wider min-w-[150px] md:min-w-[200px] border-r border-white/[0.06]">
+                      # &nbsp;Neighborhood / ZIP
+                    </th>
+                    <th className="sticky top-[65px] z-20 bg-[#0d0d0d] py-3 px-3 md:py-4 md:px-5 font-medium text-[10px] text-zinc-500 uppercase tracking-wider text-center whitespace-nowrap">Activity</th>
+                    <th className="sticky top-[65px] z-20 bg-[#0d0d0d] py-3 px-3 md:py-4 md:px-5 font-medium text-[10px] text-zinc-500 uppercase tracking-wider text-right whitespace-nowrap">Avg ARV</th>
+                    <th className="sticky top-[65px] z-20 bg-[#0d0d0d] py-3 px-3 md:py-4 md:px-5 font-medium text-[10px] text-zinc-500 uppercase tracking-wider text-right whitespace-nowrap">Avg Flip</th>
+                    <th className="sticky top-[65px] z-20 bg-[#0d0d0d] py-3 px-3 md:py-4 md:px-5 font-medium text-[10px] text-zinc-500 uppercase tracking-wider text-right whitespace-nowrap">Cash Flow</th>
+                    <th className="sticky top-[65px] z-20 bg-[#0d0d0d] py-3 px-3 md:py-4 md:px-5 font-medium text-[10px] text-zinc-500 uppercase tracking-wider text-center whitespace-nowrap">Quality</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.03]">
+                  {filtered.slice(0, 100).map((item, i) => {
+                    const profitColor = item.avg_profit >= 30000 ? "text-emerald-400" : item.avg_profit >= 10000 ? "text-amber-400" : "text-red-400";
+                    const cfColor = item.avg_cash_flow >= 300 ? "text-emerald-400" : item.avg_cash_flow >= 0 ? "text-amber-400" : "text-red-400";
+                    const greenPct = Math.round((item.greenCount / item.count) * 100);
+                    const redPct = Math.round((item.redCount / item.count) * 100);
+                    return (
+                      <tr key={`${item.zip}-${i}`} className="hover:bg-white/[0.02] transition-colors group">
+                        <td className="sticky left-0 z-10 bg-[#0d0d0d] group-hover:bg-[#111111] transition-colors py-3 px-4 md:py-4 md:px-5 min-w-[150px] md:min-w-[200px] border-r border-white/[0.06]">
+                          <div className="flex items-center gap-2 md:gap-3">
+                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-white/[0.05] text-[9px] font-medium text-zinc-600 flex items-center justify-center">{i + 1}</span>
+                            <div>
+                              <div className="text-zinc-200 font-medium leading-tight text-xs md:text-sm">{item.city !== "Unknown" ? item.city : `ZIP ${item.zip}`}</div>
+                              <div className="text-[9px] text-zinc-600 mt-0.5">{item.zip} · {item.state}{item.county ? ` · ${item.county}` : ""}</div>
                             </div>
-                          )},
-                        ].map(({ label, value }) => (
-                          <div key={label} className="flex flex-col items-start px-3 py-1.5 min-w-[80px] border-r border-white/[0.04] last:border-r-0">
-                            <div className="text-[9px] text-zinc-600 uppercase tracking-wider mb-1">{label}</div>
-                            <div className="text-xs">{value}</div>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* ── Desktop: regular table ── */}
-            <div className="hidden md:block rounded-3xl overflow-hidden border border-white/[0.05] bg-[#0d0d0d]">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="border-b border-white/[0.05]">
-                    <tr>
-                      <th className="sticky left-0 z-10 bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider min-w-[200px] border-r border-white/[0.06]"># &nbsp;Neighborhood / ZIP</th>
-                      <th className="bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-center">Activity</th>
-                      <th className="bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-right">Avg ARV</th>
-                      <th className="bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-right">Avg Flip</th>
-                      <th className="bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-right">Cash Flow</th>
-                      <th className="bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-center">Deal Quality</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/[0.03]">
-                    {filtered.slice(0, 100).map((item, i) => {
-                      const profitColor = item.avg_profit >= 30000 ? "text-emerald-400" : item.avg_profit >= 10000 ? "text-amber-400" : "text-red-400";
-                      const cfColor = item.avg_cash_flow >= 300 ? "text-emerald-400" : item.avg_cash_flow >= 0 ? "text-amber-400" : "text-red-400";
-                      const greenPct = Math.round((item.greenCount / item.count) * 100);
-                      const redPct = Math.round((item.redCount / item.count) * 100);
-                      return (
-                        <tr key={`d-${item.zip}-${i}`} className="hover:bg-white/[0.02] transition-colors group">
-                          <td className="sticky left-0 z-10 bg-[#0d0d0d] group-hover:bg-[#111111] transition-colors py-4 px-5 min-w-[200px] border-r border-white/[0.06]">
-                            <div className="flex items-center gap-3">
-                              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-white/[0.05] text-[10px] font-medium text-zinc-600 flex items-center justify-center">{i + 1}</span>
-                              <div>
-                                <div className="text-zinc-200 font-medium leading-tight">{item.city !== "Unknown" ? item.city : `ZIP ${item.zip}`}</div>
-                                <div className="text-[10px] text-zinc-600 mt-0.5">{item.zip} · {item.state}{item.county ? ` · ${item.county}` : ""}</div>
-                              </div>
+                        </td>
+                        <td className="py-3 px-3 md:py-4 md:px-5 text-center">
+                          <span className="inline-flex items-center px-2 py-0.5 md:px-2.5 md:py-1 rounded-lg text-[10px] md:text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 whitespace-nowrap">
+                            {item.count} <span className="hidden md:inline ml-1">{item.count === 1 ? "analysis" : "analyses"}</span>
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 md:py-4 md:px-5 text-right text-zinc-400 text-xs whitespace-nowrap">{fmt(item.avg_arv)}</td>
+                        <td className={`py-3 px-3 md:py-4 md:px-5 text-right font-medium text-xs whitespace-nowrap ${profitColor}`}>{item.avg_profit >= 0 ? "+" : ""}{fmt(item.avg_profit)}</td>
+                        <td className={`py-3 px-3 md:py-4 md:px-5 text-right text-xs font-medium whitespace-nowrap ${cfColor}`}>{fmtCash(item.avg_cash_flow)}</td>
+                        <td className="py-3 px-3 md:py-4 md:px-5">
+                          <div className="flex items-center gap-1.5 justify-center">
+                            <div className="w-14 md:w-20 h-1.5 rounded-full overflow-hidden bg-white/[0.05] flex">
+                              <div className="bg-emerald-500/70 h-full" style={{ width: `${greenPct}%` }} />
+                              <div className="bg-amber-500/70 h-full" style={{ width: `${100 - greenPct - redPct}%` }} />
+                              <div className="bg-red-500/70 h-full" style={{ width: `${redPct}%` }} />
                             </div>
-                          </td>
-                          <td className="py-4 px-5 text-center">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                              {item.count} {item.count === 1 ? "analysis" : "analyses"}
-                            </span>
-                          </td>
-                          <td className="py-4 px-5 text-right text-zinc-400">{fmt(item.avg_arv)}</td>
-                          <td className={`py-4 px-5 text-right font-medium ${profitColor}`}>{item.avg_profit >= 0 ? "+" : ""}{fmt(item.avg_profit)}</td>
-                          <td className={`py-4 px-5 text-right text-xs font-medium ${cfColor}`}>{fmtCash(item.avg_cash_flow)}</td>
-                          <td className="py-4 px-5">
-                            <div className="flex items-center gap-2 justify-center">
-                              <div className="w-20 h-1.5 rounded-full overflow-hidden bg-white/[0.05] flex">
-                                <div className="bg-emerald-500/70 h-full" style={{ width: `${greenPct}%` }} />
-                                <div className="bg-amber-500/70 h-full" style={{ width: `${100 - greenPct - redPct}%` }} />
-                                <div className="bg-red-500/70 h-full" style={{ width: `${redPct}%` }} />
-                              </div>
-                              <span className="text-[10px] text-zinc-600 w-8 text-right">{greenPct}%</span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div className="px-6 py-4 border-t border-white/[0.05] flex items-center gap-4 flex-wrap">
-                <span className="text-[10px] text-zinc-700 uppercase tracking-widest">Deal Quality</span>
-                {[
-                  { color: "bg-emerald-500/70", label: "Green deals" },
-                  { color: "bg-amber-500/70", label: "Yellow" },
-                  { color: "bg-red-500/70", label: "Red deals" },
-                ].map(({ color, label }) => (
-                  <div key={label} className="flex items-center gap-1.5">
-                    <div className={`w-3 h-1.5 rounded-full ${color}`} />
-                    <span className="text-[10px] text-zinc-600">{label}</span>
-                  </div>
-                ))}
-                <span className="ml-auto text-[10px] text-zinc-700">No individual addresses shown</span>
-              </div>
+                            <span className="text-[9px] text-zinc-600 w-6 text-right">{greenPct}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          </>
+            <div className="px-4 md:px-6 py-3 md:py-4 border-t border-white/[0.05] flex items-center gap-3 flex-wrap">
+              <span className="text-[10px] text-zinc-700 uppercase tracking-widest">Deal Quality</span>
+              {[
+                { color: "bg-emerald-500/70", label: "Green" },
+                { color: "bg-amber-500/70", label: "Yellow" },
+                { color: "bg-red-500/70", label: "Red" },
+              ].map(({ color, label }) => (
+                <div key={label} className="flex items-center gap-1.5">
+                  <div className={`w-3 h-1.5 rounded-full ${color}`} />
+                  <span className="text-[10px] text-zinc-600">{label}</span>
+                </div>
+              ))}
+              <span className="ml-auto text-[10px] text-zinc-700 hidden md:block">No individual addresses shown</span>
+            </div>
+          </div>
         )}
 
         <div className="mt-12 text-center">
