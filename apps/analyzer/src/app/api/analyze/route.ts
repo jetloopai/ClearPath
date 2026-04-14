@@ -326,13 +326,13 @@ export async function POST(req: NextRequest) {
 
   // Atomic decrement BEFORE expensive work — prevents race condition where two
   // simultaneous requests both pass the check above and both run at your cost.
-  const { error: decrementError, count: decrementCount } = await supabaseAdmin
+  const { error: decrementError, data: decrementData } = await supabaseAdmin
     .from('user_profiles')
     .update({ credits_remaining: creditsRemaining - 1, updated_at: new Date().toISOString() })
     .eq('id', authUser.id)
     .gt('credits_remaining', 0)  // only succeeds if credit still available
-    .select('id', { count: 'exact', head: true })
-  if (decrementError || decrementCount === 0) {
+    .select('id')
+  if (decrementError || !decrementData?.length) {
     return NextResponse.json({ error: 'upgrade_required', plan: currentPlan }, { status: 402 })
   }
   // ─────────────────────────────────────────────────────────────────────────
