@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import { supabase } from "@/lib/supabase-browser";
 import { AuthModal } from "./AuthModal";
@@ -107,8 +106,8 @@ export function Navbar() {
     <>
       <header className="fixed top-0 inset-x-0 z-50 bg-black/40 backdrop-blur-xl border-b border-white/[0.05]">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center">
-            <Image src="/Clearpath Analyzer logo design.png" alt="ClearPath Analyzer" width={140} height={40} className="h-9 w-auto" priority />
+          <Link href="/" className="text-lg font-semibold tracking-tight text-zinc-100 hover:text-white transition-colors">
+            ClearPath
           </Link>
 
           {/* Desktop nav */}
