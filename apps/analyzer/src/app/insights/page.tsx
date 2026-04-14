@@ -1,4 +1,5 @@
 import React from 'react';
+import { unstable_noStore as noStore } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import InsightsClient, { type ZipRow } from './InsightsClient';
 
@@ -10,6 +11,7 @@ export const metadata = {
 };
 
 export default async function InsightsPage() {
+  noStore();
   const { data: analyses } = await supabaseAdmin
     .from('analyses')
     .select('inputs, arv, flip_profit, monthly_cash_flow, deal_signal')
