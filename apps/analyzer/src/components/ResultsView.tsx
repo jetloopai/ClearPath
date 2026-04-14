@@ -1840,12 +1840,14 @@ export default function ResultsView() {
                 brrrrSignal === "yellow" ? "bg-amber-500/[0.06] border-amber-500/20" :
                 "bg-red-500/[0.06] border-red-500/20"
               }`}>
-                <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">Cash Left in Deal</div>
+                <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">
+                  {cashLeftInDeal <= 0 ? "Cash Back" : "Cash Left in Deal"}
+                </div>
                 <div className={`text-xl font-bold ${brrrrSignal === "green" ? "text-emerald-400" : brrrrSignal === "yellow" ? "text-amber-400" : "text-red-400"}`}>
-                  {cashLeftInDeal <= 0 ? `−${fmt(Math.abs(cashLeftInDeal))}` : fmt(cashLeftInDeal)}
+                  {cashLeftInDeal <= 0 ? `+${fmt(Math.abs(cashLeftInDeal))}` : fmt(cashLeftInDeal)}
                 </div>
                 <div className={`text-[10px] mt-1 ${brrrrSignal === "green" ? "text-emerald-600" : "text-zinc-600"}`}>
-                  {cashLeftInDeal <= 0 ? "✓ All cash recycled" : `of ${fmt(allInCost)} all-in`}
+                  {cashLeftInDeal <= 0 ? "✓ All capital recycled" : `of ${fmt(allInCost)} all-in`}
                 </div>
               </div>
               <div className={`rounded-2xl border p-4 text-center ${
@@ -1858,7 +1860,9 @@ export default function ResultsView() {
                   {postRefiCashFlow >= 0 ? "+" : ""}{fmt(postRefiCashFlow)}/mo
                 </div>
                 <div className="text-[10px] text-zinc-600 mt-1">
-                  {postRefiCoC === Infinity ? "∞ CoC — all capital out" : `${postRefiCoC}% CoC return`}
+                  {postRefiCoC === Infinity
+                    ? (postRefiCashFlow >= 0 ? "∞ CoC — all capital out" : "→ CoC — all capital out")
+                    : `${postRefiCoC}% CoC return`}
                 </div>
               </div>
             </div>
