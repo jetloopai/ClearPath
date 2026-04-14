@@ -14,7 +14,7 @@ export default async function InsightsPage() {
     .from('analyses')
     .select('inputs, arv, flip_profit, monthly_cash_flow, deal_signal')
     .order('created_at', { ascending: false })
-    .limit(2000);
+    .limit(10000);
 
   type Agg = {
     zip: string; city: string; state: string; county: string;
