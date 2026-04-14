@@ -184,8 +184,8 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
               <table className="w-full text-sm text-left">
                 <thead className="bg-white/[0.02] border-b border-white/[0.05]">
                   <tr>
-                    <th className="py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider w-12">Rank</th>
-                    <th className="py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider">Neighborhood / ZIP</th>
+                    <th className="sticky left-0 z-10 bg-[#0a0a0a] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider w-12">Rank</th>
+                    <th className="sticky left-12 z-10 bg-[#0a0a0a] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider min-w-[180px]">Neighborhood / ZIP</th>
                     <th className="py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-center">Activity</th>
                     <th className="py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-right">Avg ARV</th>
                     <th className="py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-right">Avg Flip</th>
@@ -201,13 +201,13 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
                     const redPct = Math.round((item.redCount / item.count) * 100);
 
                     return (
-                      <tr key={`${item.zip}-${i}`} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="py-4 px-5 w-12">
+                      <tr key={`${item.zip}-${i}`} className="hover:bg-white/[0.02] transition-colors group">
+                        <td className="sticky left-0 z-10 bg-[#0a0a0a] group-hover:bg-zinc-900/80 py-4 px-5 w-12 transition-colors">
                           <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/[0.05] text-[10px] font-medium text-zinc-500">
                             {i + 1}
                           </span>
                         </td>
-                        <td className="py-4 px-5">
+                        <td className="sticky left-12 z-10 bg-[#0a0a0a] group-hover:bg-zinc-900/80 py-4 px-5 min-w-[180px] transition-colors">
                           <div className="text-zinc-200 font-medium">
                             {item.city !== "Unknown" ? item.city : `ZIP ${item.zip}`}
                           </div>
