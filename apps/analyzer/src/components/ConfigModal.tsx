@@ -59,6 +59,8 @@ export function ConfigModal({ address, county, onClose }: ConfigModalProps) {
   const [insurance, setInsurance] = useState("100");
   const [manualSqft, setManualSqft] = useState("");
   const [showManualSqft, setShowManualSqft] = useState(false);
+  const [bedsOverride, setBedsOverride] = useState("");
+  const [bathsOverride, setBathsOverride] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showUpgrade, setShowUpgrade] = useState(false);
@@ -150,6 +152,8 @@ export function ConfigModal({ address, county, onClose }: ConfigModalProps) {
           rentOverride: rentOverride ? Number(rentOverride.replace(/[^0-9]/g, "")) || null : null,
           insuranceOverride: Number(insurance) || null,
           manualSqft: manualSqft ? Number(manualSqft.replace(/[^0-9]/g, "")) || null : null,
+          bedsOverride: bedsOverride ? Number(bedsOverride) || null : null,
+          bathsOverride: bathsOverride ? Number(bathsOverride) || null : null,
         }),
       });
 
@@ -438,6 +442,24 @@ export function ConfigModal({ address, county, onClose }: ConfigModalProps) {
                   />
                 </div>
               )}
+              <div>
+                <label className="text-xs text-zinc-300 mb-1 block">
+                  Beds Override
+                  <span className="ml-1 text-zinc-500">(blank = provider data)</span>
+                </label>
+                <input type="number" min="1" max="20" value={bedsOverride} onChange={(e) => setBedsOverride(e.target.value)}
+                  placeholder="auto"
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500/40 transition-colors" />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-300 mb-1 block">
+                  Baths Override
+                  <span className="ml-1 text-zinc-500">(blank = provider data)</span>
+                </label>
+                <input type="number" min="1" max="20" step="0.5" value={bathsOverride} onChange={(e) => setBathsOverride(e.target.value)}
+                  placeholder="auto"
+                  className="w-full bg-white/[0.03] border border-white/[0.06] rounded-xl py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500/40 transition-colors" />
+              </div>
               <div>
                 <label className="text-xs text-zinc-300 mb-1 block">Down Payment %</label>
                 <input type="text" value={downPayment} onChange={(e) => setDownPayment(e.target.value)}

@@ -135,11 +135,11 @@ function getSqftVerificationIssue(property: PropertyData, effectiveSqft: number,
   }
 }
 
-function buildSubjectDataProvenance(property: PropertyData, manualSqft: number | null, effectiveSqft: number, manualSqftReason: ManualSqftReason): SubjectDataProvenance {
+function buildSubjectDataProvenance(property: PropertyData, manualSqft: number | null, effectiveSqft: number, manualSqftReason: ManualSqftReason, effectiveBeds: number | null, effectiveBaths: number | null): SubjectDataProvenance {
   const subjectProvider = property.subjectProvider ? getProviderLabel(property.subjectProvider) : null
   const sharedFacts = {
-    bedrooms: property.bedrooms ?? null,
-    bathrooms: property.bathrooms ?? null,
+    bedrooms: effectiveBeds ?? null,
+    bathrooms: effectiveBaths ?? null,
     yearBuilt: property.yearBuilt ?? null,
     propertyType: property.propertyType ?? null,
   }
@@ -351,12 +351,14 @@ export async function POST(req: NextRequest) {
   // ─────────────────────────────────────────────────────────────────────────
 
   const body = await req.json()
-  const { address, price, condition, county, units: unitsRaw, downPaymentPct, holdMonths, interestRateOverride, rentOverride, insuranceOverride, manualSqft: manualSqftRaw } = body
+  const { address, price, condition, county, units: unitsRaw, downPaymentPct, holdMonths, interestRateOverride, rentOverride, insuranceOverride, manualSqft: manualSqftRaw, bedsOverride: bedsOverrideRaw, bathsOverride: bathsOverrideRaw } = body
 
   const numericPrice = Number(price)
   const units: number = Math.max(1, Math.min(4, Number(unitsRaw) || 1))
   const manualSqft = Number(manualSqftRaw)
   const normalizedManualSqft = Number.isFinite(manualSqft) && manualSqft > 0 ? Math.round(manualSqft) : null
+  const normalizedBedsOverride = bedsOverrideRaw != null && Number(bedsOverrideRaw) > 0 ? Math.round(Number(bedsOverrideRaw)) : null
+  const normalizedBathsOverride = bathsOverrideRaw != null && Number(bathsOverrideRaw) > 0 ? Number(bathsOverrideRaw) : null
 
   if (typeof address !== 'string' || address.trim().length === 0 || address.length > 500) {
     return NextResponse.json({ error: 'Invalid address' }, { status: 400 })
@@ -428,11 +430,13 @@ export async function POST(req: NextRequest) {
   }
 
   const effectiveSqft = normalizedManualSqft ?? property.sqft!
+  const effectiveBeds = normalizedBedsOverride ?? property.bedrooms
+  const effectiveBaths = normalizedBathsOverride ?? property.bathrooms
   const manualSqftReason = getManualSqftReason(property, normalizedManualSqft)
   const isCookCounty = county ? county === 'Cook County' : property.county === 'Cook'
   const propertyTaxRate = isCookCounty ? (cfg.cook_county_tax_rate ?? 0.022) : STATE_TAX_RATES[property.state?.toUpperCase()] ?? (cfg.property_tax_rate ?? 0.015)
 
-  const compsDetails = calculateCompsArvDetails(property.comps, property.lat, property.lng, effectiveSqft, property.bedrooms, compsUplift[condition])
+  const compsDetails = calculateCompsArvDetails(property.comps, property.lat, property.lng, effectiveSqft, effectiveBeds, compsUplift[condition])
   const sqftVerificationIssue = !normalizedManualSqft
     ? getSqftVerificationIssue(property, effectiveSqft, compsDetails?.filteredComps ?? null)
     : null
@@ -451,7 +455,7 @@ export async function POST(req: NextRequest) {
       },
     }, { status: 422 })
   }
-  const subjectData = buildSubjectDataProvenance(property, normalizedManualSqft, effectiveSqft, manualSqftReason)
+  const subjectData = buildSubjectDataProvenance(property, normalizedManualSqft, effectiveSqft, manualSqftReason, effectiveBeds, effectiveBaths)
 
   const providerAvm = property.valueEstimate ? Math.round(property.valueEstimate * compsUplift[condition]) : null
   const roughArvEstimate = Math.round(numericPrice * arvMultipliers[condition])
