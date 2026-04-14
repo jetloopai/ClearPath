@@ -1829,37 +1829,37 @@ export default function ResultsView() {
             </div>
 
             {/* 3 Key Metric Cards */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] p-4 text-center">
-                <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">Refi Loan</div>
-                <div className="text-xl font-bold text-foreground">{fmt(refiLoan)}</div>
-                <div className="text-[10px] text-zinc-600 mt-1">{Math.round(refiLTV * 100)}% of {fmt(results.arv)} ARV</div>
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="rounded-2xl bg-white/[0.03] border border-white/[0.05] p-3 text-center">
+                <div className="text-[9px] uppercase tracking-widest text-zinc-600 mb-1">Refi Loan</div>
+                <div className="text-base font-bold text-foreground leading-tight">{fmtShort(refiLoan)}</div>
+                <div className="text-[9px] text-zinc-600 mt-1">{Math.round(refiLTV * 100)}% of {fmtShort(results.arv)}</div>
               </div>
-              <div className={`rounded-2xl border p-4 text-center ${
+              <div className={`rounded-2xl border p-3 text-center ${
                 brrrrSignal === "green" ? "bg-emerald-500/[0.06] border-emerald-500/20" :
                 brrrrSignal === "yellow" ? "bg-amber-500/[0.06] border-amber-500/20" :
                 "bg-red-500/[0.06] border-red-500/20"
               }`}>
-                <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">
-                  {cashLeftInDeal <= 0 ? "Cash Back" : "Cash Left in Deal"}
+                <div className="text-[9px] uppercase tracking-widest text-zinc-600 mb-1 leading-tight">
+                  {cashLeftInDeal <= 0 ? "Cash Back" : "Cash Left"}
                 </div>
-                <div className={`text-xl font-bold ${brrrrSignal === "green" ? "text-emerald-400" : brrrrSignal === "yellow" ? "text-amber-400" : "text-red-400"}`}>
-                  {cashLeftInDeal <= 0 ? `+${fmt(Math.abs(cashLeftInDeal))}` : fmt(cashLeftInDeal)}
+                <div className={`text-base font-bold leading-tight ${brrrrSignal === "green" ? "text-emerald-400" : brrrrSignal === "yellow" ? "text-amber-400" : "text-red-400"}`}>
+                  {cashLeftInDeal <= 0 ? `+${fmtShort(Math.abs(cashLeftInDeal))}` : fmtShort(cashLeftInDeal)}
                 </div>
-                <div className={`text-[10px] mt-1 ${brrrrSignal === "green" ? "text-emerald-600" : "text-zinc-600"}`}>
-                  {cashLeftInDeal <= 0 ? "✓ All capital recycled" : `of ${fmt(allInCost)} all-in`}
+                <div className={`text-[9px] mt-1 ${brrrrSignal === "green" ? "text-emerald-600" : "text-zinc-600"}`}>
+                  {cashLeftInDeal <= 0 ? "✓ All capital recycled" : `of ${fmtShort(allInCost)} all-in`}
                 </div>
               </div>
-              <div className={`rounded-2xl border p-4 text-center ${
+              <div className={`rounded-2xl border p-3 text-center ${
                 postRefiCashFlow >= 200 ? "bg-emerald-500/[0.06] border-emerald-500/20" :
                 postRefiCashFlow >= 0 ? "bg-amber-500/[0.06] border-amber-500/20" :
                 "bg-red-500/[0.06] border-red-500/20"
               }`}>
-                <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">Post-Refi Flow</div>
-                <div className={`text-xl font-bold ${postRefiCashFlow >= 200 ? "text-emerald-400" : postRefiCashFlow >= 0 ? "text-amber-400" : "text-red-400"}`}>
-                  {postRefiCashFlow >= 0 ? "+" : ""}{fmt(postRefiCashFlow)}/mo
+                <div className="text-[9px] uppercase tracking-widest text-zinc-600 mb-1">Post-Refi Flow</div>
+                <div className={`text-base font-bold leading-tight ${postRefiCashFlow >= 200 ? "text-emerald-400" : postRefiCashFlow >= 0 ? "text-amber-400" : "text-red-400"}`}>
+                  {postRefiCashFlow >= 0 ? "+" : ""}{fmtShort(postRefiCashFlow)}/mo
                 </div>
-                <div className="text-[10px] text-zinc-600 mt-1">
+                <div className="text-[9px] text-zinc-600 mt-1">
                   {postRefiCoC === Infinity
                     ? (postRefiCashFlow >= 0 ? "∞ CoC — all capital out" : "→ CoC — all capital out")
                     : `${postRefiCoC}% CoC return`}
