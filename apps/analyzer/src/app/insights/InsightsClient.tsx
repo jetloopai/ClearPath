@@ -179,17 +179,17 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
             <p className="text-zinc-400">No data for this filter yet.</p>
           </div>
         ) : (
-          <div className="rounded-3xl overflow-hidden border border-white/[0.05] bg-[#0d0d0d]">
+          <div className="-mx-6 md:mx-0 md:rounded-3xl overflow-hidden border-y md:border border-white/[0.05] bg-[#0d0d0d]">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="border-b border-white/[0.05]">
                   <tr>
-                    <th className="sticky left-0 z-10 bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider min-w-[200px] border-r border-white/[0.06]">#&nbsp;&nbsp;Neighborhood / ZIP</th>
-                    <th className="bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-center">Activity</th>
-                    <th className="bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-right">Avg ARV</th>
-                    <th className="bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-right">Avg Flip</th>
-                    <th className="bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-right">Cash Flow</th>
-                    <th className="bg-[#0d0d0d] py-4 px-5 font-medium text-xs text-zinc-500 uppercase tracking-wider text-center">Deal Quality</th>
+                    <th className="sticky left-0 z-10 bg-[#0d0d0d] py-3 px-4 font-medium text-[10px] text-zinc-500 uppercase tracking-wider min-w-[160px] border-r border-white/[0.06]"># &nbsp;Neighborhood / ZIP</th>
+                    <th className="bg-[#0d0d0d] py-3 px-3 font-medium text-[10px] text-zinc-500 uppercase tracking-wider text-center whitespace-nowrap">Activity</th>
+                    <th className="bg-[#0d0d0d] py-3 px-3 font-medium text-[10px] text-zinc-500 uppercase tracking-wider text-right whitespace-nowrap">Avg ARV</th>
+                    <th className="bg-[#0d0d0d] py-3 px-3 font-medium text-[10px] text-zinc-500 uppercase tracking-wider text-right whitespace-nowrap">Avg Flip</th>
+                    <th className="bg-[#0d0d0d] py-3 px-3 font-medium text-[10px] text-zinc-500 uppercase tracking-wider text-right whitespace-nowrap">Cash Flow</th>
+                    <th className="bg-[#0d0d0d] py-3 px-3 font-medium text-[10px] text-zinc-500 uppercase tracking-wider text-center whitespace-nowrap">Quality</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.03]">
@@ -201,41 +201,41 @@ export default function InsightsClient({ rows, states, totalRaw }: Props) {
 
                     return (
                       <tr key={`${item.zip}-${i}`} className="hover:bg-white/[0.02] transition-colors group">
-                        <td className="sticky left-0 z-10 bg-[#0d0d0d] group-hover:bg-[#111111] transition-colors py-4 px-5 min-w-[200px] border-r border-white/[0.06]">
-                          <div className="flex items-center gap-3">
-                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-white/[0.05] text-[10px] font-medium text-zinc-600 flex items-center justify-center">
+                        <td className="sticky left-0 z-10 bg-[#0d0d0d] group-hover:bg-[#111111] transition-colors py-3 px-4 min-w-[160px] border-r border-white/[0.06]">
+                          <div className="flex items-center gap-2">
+                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-white/[0.05] text-[9px] font-medium text-zinc-600 flex items-center justify-center">
                               {i + 1}
                             </span>
                             <div>
-                              <div className="text-zinc-200 font-medium leading-tight">
+                              <div className="text-zinc-200 font-medium leading-tight text-xs">
                                 {item.city !== "Unknown" ? item.city : `ZIP ${item.zip}`}
                               </div>
-                              <div className="text-[10px] text-zinc-600 mt-0.5">
+                              <div className="text-[9px] text-zinc-600 mt-0.5">
                                 {item.zip} · {item.state}{item.county ? ` · ${item.county}` : ""}
                               </div>
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 px-5 text-center">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                            {item.count} {item.count === 1 ? "analysis" : "analyses"}
+                        <td className="py-3 px-3 text-center">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 whitespace-nowrap">
+                            {item.count}
                           </span>
                         </td>
-                        <td className="py-4 px-5 text-right text-zinc-400 font-serif">{fmt(item.avg_arv)}</td>
-                        <td className={`py-4 px-5 text-right font-medium font-serif ${profitColor}`}>
+                        <td className="py-3 px-3 text-right text-zinc-400 text-xs whitespace-nowrap">{fmt(item.avg_arv)}</td>
+                        <td className={`py-3 px-3 text-right font-medium text-xs whitespace-nowrap ${profitColor}`}>
                           {item.avg_profit >= 0 ? "+" : ""}{fmt(item.avg_profit)}
                         </td>
-                        <td className={`py-4 px-5 text-right text-xs font-medium ${cfColor}`}>
+                        <td className={`py-3 px-3 text-right text-xs font-medium whitespace-nowrap ${cfColor}`}>
                           {fmtCash(item.avg_cash_flow)}
                         </td>
-                        <td className="py-4 px-5">
-                          <div className="flex items-center gap-2 justify-center">
-                            <div className="w-20 h-1.5 rounded-full overflow-hidden bg-white/[0.05] flex">
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-1.5 justify-center">
+                            <div className="w-14 h-1.5 rounded-full overflow-hidden bg-white/[0.05] flex">
                               <div className="bg-emerald-500/70 h-full" style={{ width: `${greenPct}%` }} />
                               <div className="bg-amber-500/70 h-full" style={{ width: `${100 - greenPct - redPct}%` }} />
                               <div className="bg-red-500/70 h-full" style={{ width: `${redPct}%` }} />
                             </div>
-                            <span className="text-[10px] text-zinc-600 w-8 text-right">{greenPct}%</span>
+                            <span className="text-[9px] text-zinc-600 w-6 text-right">{greenPct}%</span>
                           </div>
                         </td>
                       </tr>
