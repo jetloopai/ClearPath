@@ -1,5 +1,6 @@
-import { type ProviderName, providerPolicies, type ProviderSelectionPolicy } from '@/lib/providers/config'
+import { type ProviderName, providerPolicies, type ProviderSelectionPolicy, getRapidApiZillowKey } from '@/lib/providers/config'
 import { RentCastProvider } from '@/lib/providers/rentcast'
+import { RealtyInUSProvider } from '@/lib/providers/realtyinus'
 import { getCachedRentCast, setCachedRentCast } from '@/lib/providers/rentcastCache'
 
 export interface CompListing {
@@ -348,19 +349,41 @@ function buildCanonicalStub(address: string): CanonicalPropertyData {
 }
 
 export async function getCanonicalPropertyData(address: string, policy: ProviderSelectionPolicy = providerPolicies): Promise<CanonicalPropertyData> {
-  const provider = new RentCastProvider()
+  const rentCast = new RentCastProvider()
 
-  // Check DB cache before calling RentCast
+  // Check DB cache for RentCast value/rent (still used regardless of subject provider)
   const cached = await getCachedRentCast(address)
 
-  const subjectResult = cached.subject
-    ? provider.lookupSubjectFromCache(cached.subject)
-    : await provider.lookupSubject(address)
+  // ── Subject facts: try Realty in US first (MLS-sourced), fall back to RentCast ──
+  let subjectResult: Awaited<ReturnType<typeof rentCast.lookupSubject>>
+  let subjectProviderName: ProviderName
+
+  const hasRapidApiKey = Boolean(getRapidApiZillowKey())
+
+  if (hasRapidApiKey) {
+    const realtyInUS = new RealtyInUSProvider()
+    const realtyResult = await realtyInUS.lookupSubject(address)
+    if (realtyResult.status === 'success' && realtyResult.data) {
+      subjectResult = realtyResult
+      subjectProviderName = 'realtyinus'
+    } else {
+      // Fall back to RentCast for subject facts
+      subjectResult = cached.subject
+        ? rentCast.lookupSubjectFromCache(cached.subject)
+        : await rentCast.lookupSubject(address)
+      subjectProviderName = 'rentcast'
+    }
+  } else {
+    subjectResult = cached.subject
+      ? rentCast.lookupSubjectFromCache(cached.subject)
+      : await rentCast.lookupSubject(address)
+    subjectProviderName = 'rentcast'
+  }
 
   if (!subjectResult.data) {
-    const reason = subjectResult.error ?? 'RentCast subject lookup failed'
+    const reason = subjectResult.error ?? 'Subject lookup failed'
     const stubTrace: ProviderTrace = {
-      subjectFacts: toProviderTraceDomain(policy.subjectFacts, ['rentcast'], null, subjectResult.status === 'error' ? 'error' : 'missing', reason),
+      subjectFacts: toProviderTraceDomain(policy.subjectFacts, [subjectProviderName, 'rentcast'], null, subjectResult.status === 'error' ? 'error' : 'missing', reason),
       value: toProviderTraceDomain(policy.value, ['rentcast'], null, 'fallback', 'Subject lookup failed before value estimate'),
       rent: toProviderTraceDomain(policy.rent, ['rentcast'], null, 'fallback', 'Subject lookup failed before rent estimate'),
       comps: toProviderTraceDomain(policy.comps, ['rentcast'], null, 'fallback', 'Subject lookup failed before comparable lookup'),
@@ -371,36 +394,44 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
       providerTrace: stubTrace,
       providerWarnings: buildProviderWarnings(stubTrace),
       rawProviders: {
-        rentcast: {
-          subject: subjectResult.trimmedRaw ?? null,
-          error: reason,
-        },
+        [subjectProviderName]: { subject: subjectResult.trimmedRaw ?? null, error: reason },
       },
     }
   }
 
-  // Inject cached responses into provider so it skips those API calls
-  if (cached.value) provider.injectCache('/avm/value', subjectResult.data.address, cached.value)
-  if (cached.rent)  provider.injectCache('/avm/rent/long-term', subjectResult.data.address, cached.rent)
+  // ── Value / rent / comps: always from RentCast ──
+  // Inject cached responses so RentCast skips those API calls
+  if (cached.value) rentCast.injectCache('/avm/value', address, cached.value)
+  if (cached.rent)  rentCast.injectCache('/avm/rent/long-term', address, cached.rent)
+
+  // Use a subject record that preserves the original address string so RentCast
+  // cache keys stay consistent regardless of which provider resolved the address
+  const rentCastSubject = { ...subjectResult.data, address }
 
   const [valueResult, rentResult, compsResult, rentalResult] = await Promise.all([
-    provider.getValueEstimate(subjectResult.data),
-    provider.getRentEstimate(subjectResult.data),
-    provider.getSaleComparables(subjectResult.data),
-    provider.getRentalListings(subjectResult.data),
+    rentCast.getValueEstimate(rentCastSubject),
+    rentCast.getRentEstimate(rentCastSubject),
+    rentCast.getSaleComparables(rentCastSubject),
+    rentCast.getRentalListings(rentCastSubject),
   ])
 
-  // Persist any fresh responses to the DB cache (only what wasn't already cached)
+  // Persist fresh RentCast responses to DB cache
   const cacheUpdates: Parameters<typeof setCachedRentCast>[1] = {}
-  if (!cached.subject) cacheUpdates.subject = subjectResult.raw ?? null
-  if (!cached.value)   cacheUpdates.value   = valueResult.raw   ?? null
-  if (!cached.rent)    cacheUpdates.rent     = rentResult.raw    ?? null
+  if (!cached.subject && subjectProviderName === 'rentcast') cacheUpdates.subject = subjectResult.raw ?? null
+  if (!cached.value) cacheUpdates.value = valueResult.raw ?? null
+  if (!cached.rent)  cacheUpdates.rent  = rentResult.raw  ?? null
   if (Object.keys(cacheUpdates).length > 0) {
     void setCachedRentCast(address, cacheUpdates)
   }
 
   const trace: ProviderTrace = {
-    subjectFacts: toProviderTraceDomain(policy.subjectFacts, ['rentcast'], subjectResult.provider, subjectResult.data.sqft ? 'success' : 'missing', subjectResult.data.sqft ? null : 'RentCast property record did not include square footage'),
+    subjectFacts: toProviderTraceDomain(
+      policy.subjectFacts,
+      [subjectProviderName],
+      subjectResult.data ? subjectProviderName : null,
+      subjectResult.data?.sqft ? 'success' : 'missing',
+      subjectResult.data?.sqft ? null : `${subjectProviderName === 'realtyinus' ? 'Realtor.com' : 'RentCast'} record did not include square footage`,
+    ),
     value: toProviderTraceDomain(policy.value, [valueResult.provider], valueResult.data ? valueResult.provider : null, valueResult.status, valueResult.data ? null : (valueResult.error ?? 'Provider AVM unavailable')),
     rent: toProviderTraceDomain(policy.rent, [rentResult.provider], rentResult.data ? rentResult.provider : null, rentResult.status, rentResult.data ? null : (rentResult.error ?? 'Provider rent estimate unavailable')),
     comps: toProviderTraceDomain(policy.comps, [compsResult.provider], compsResult.data && compsResult.data.length > 0 ? compsResult.provider : null, compsResult.data && compsResult.data.length > 0 ? 'success' : compsResult.status, compsResult.data && compsResult.data.length > 0 ? null : (compsResult.error ?? 'Provider comparables unavailable')),
@@ -414,14 +445,14 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
     saleComparables: compsResult.data ?? [],
     rentalListings: rentalResult.data ?? [],
     selectedProviders: {
-      subjectProvider: subjectResult.provider,
+      subjectProvider: subjectProviderName,
       valueProvider: valueResult.data ? valueResult.provider : null,
       rentProvider: rentResult.data ? rentResult.provider : null,
       compsProvider: compsResult.data && compsResult.data.length > 0 ? compsResult.provider : null,
     },
     rawProviders: {
+      [subjectProviderName]: { subject: subjectResult.trimmedRaw ?? null },
       rentcast: {
-        subject: subjectResult.trimmedRaw ?? null,
         value: valueResult.trimmedRaw ?? null,
         rent: rentResult.trimmedRaw ?? null,
         comps: compsResult.trimmedRaw ?? null,

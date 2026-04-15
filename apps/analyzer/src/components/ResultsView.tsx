@@ -224,6 +224,45 @@ export default function ResultsView() {
     avgArv?: number; avgFlip?: number; avgCashFlow?: number; greenPct?: number;
   } | null>(null);
 
+  // ── Property facts inline edit ───────────────────────────────────────────────
+  const [editingFacts, setEditingFacts] = useState(false);
+  const [editSqft, setEditSqft] = useState("");
+  const [editBeds, setEditBeds] = useState("");
+  const [editBaths, setEditBaths] = useState("");
+  const [rerunning, setRerunning] = useState(false);
+
+  const handleRerunWithFacts = async () => {
+    if (!analysis) return;
+    setRerunning(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token && { Authorization: `Bearer ${session.access_token}` }),
+        },
+        body: JSON.stringify({
+          address: analysis.address,
+          price: analysis.price,
+          condition: analysis.condition,
+          units: analysis.units,
+          manualSqft: editSqft ? Number(editSqft.replace(/[^0-9]/g, "")) || null : null,
+          bedsOverride: editBeds ? Number(editBeds) || null : null,
+          bathsOverride: editBaths ? Number(editBaths) || null : null,
+        }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        const newAnalysis = { ...analysis, ...updated };
+        sessionStorage.setItem("clearpath_analysis", JSON.stringify(newAnalysis));
+        setAnalysis(newAnalysis);
+        setEditingFacts(false);
+      }
+    } catch { /* ignore */ }
+    finally { setRerunning(false); }
+  };
+
   // ── STR / Airbnb analysis state ──────────────────────────────────────────────
   const [strNightlyRate, setStrNightlyRate] = useState("");
   const [strOccupancy, setStrOccupancy] = useState("65");
@@ -838,20 +877,90 @@ export default function ResultsView() {
           <p className="text-xs text-zinc-500 mt-2">{rentExplainer ?? "Rent source unavailable."}</p>
         </div>
         <div className="glass-panel rounded-2xl p-4">
-          <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-1">Subject Facts</div>
-          <div className="text-sm text-zinc-200">{subjectData?.label ?? "Property details"}</div>
-          {subjectData ? (
-            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-              <span className="text-xs text-zinc-400">{subjectData.effectiveSqft.toLocaleString()} sq ft</span>
-              {subjectData.bedrooms != null && <span className="text-xs text-zinc-400">{subjectData.bedrooms} bed</span>}
-              {subjectData.bathrooms != null && <span className="text-xs text-zinc-400">{subjectData.bathrooms} bath</span>}
-              {subjectData.yearBuilt ? <span className="text-xs text-zinc-500">built {subjectData.yearBuilt}</span> : null}
-              {subjectData.propertyType ? <span className="text-xs text-zinc-600 capitalize">{subjectData.propertyType.toLowerCase().replace(/_/g, ' ')}</span> : null}
-            </div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[10px] uppercase tracking-widest text-zinc-600">Subject Facts</div>
+            {!editingFacts && subjectData && (
+              <button
+                onClick={() => {
+                  setEditSqft(subjectData.effectiveSqft ? String(subjectData.effectiveSqft) : "");
+                  setEditBeds(subjectData.bedrooms != null ? String(subjectData.bedrooms) : "");
+                  setEditBaths(subjectData.bathrooms != null ? String(subjectData.bathrooms) : "");
+                  setEditingFacts(true);
+                }}
+                className="text-[10px] text-zinc-500 hover:text-indigo-400 transition-colors underline underline-offset-2"
+              >
+                Fix
+              </button>
+            )}
+          </div>
+          {!editingFacts ? (
+            <>
+              <div className="text-sm text-zinc-200">{subjectData?.label ?? "Property details"}</div>
+              {subjectData ? (
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                  <span className="text-xs text-zinc-400">{subjectData.effectiveSqft.toLocaleString()} sq ft</span>
+                  {subjectData.bedrooms != null && <span className="text-xs text-zinc-400">{subjectData.bedrooms} bed</span>}
+                  {subjectData.bathrooms != null && <span className="text-xs text-zinc-400">{subjectData.bathrooms} bath</span>}
+                  {subjectData.yearBuilt ? <span className="text-xs text-zinc-500">built {subjectData.yearBuilt}</span> : null}
+                  {subjectData.propertyType ? <span className="text-xs text-zinc-600 capitalize">{subjectData.propertyType.toLowerCase().replace(/_/g, ' ')}</span> : null}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-500 mt-2">Subject data source unavailable.</p>
+              )}
+              <p className="text-xs text-zinc-600 mt-1.5">{subjectData?.summary}</p>
+            </>
           ) : (
-            <p className="text-xs text-zinc-500 mt-2">Subject data source unavailable.</p>
+            <div className="mt-2 space-y-2">
+              <div className="grid grid-cols-3 gap-1.5">
+                <div>
+                  <div className="text-[9px] text-zinc-600 mb-0.5">Sq Ft</div>
+                  <input
+                    type="number"
+                    value={editSqft}
+                    onChange={e => setEditSqft(e.target.value)}
+                    placeholder={subjectData?.effectiveSqft ? String(subjectData.effectiveSqft) : "—"}
+                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-2 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50"
+                  />
+                </div>
+                <div>
+                  <div className="text-[9px] text-zinc-600 mb-0.5">Beds</div>
+                  <input
+                    type="number"
+                    value={editBeds}
+                    onChange={e => setEditBeds(e.target.value)}
+                    placeholder={subjectData?.bedrooms != null ? String(subjectData.bedrooms) : "—"}
+                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-2 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50"
+                  />
+                </div>
+                <div>
+                  <div className="text-[9px] text-zinc-600 mb-0.5">Baths</div>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={editBaths}
+                    onChange={e => setEditBaths(e.target.value)}
+                    placeholder={subjectData?.bathrooms != null ? String(subjectData.bathrooms) : "—"}
+                    className="w-full bg-white/[0.05] border border-white/[0.1] rounded-lg px-2 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRerunWithFacts}
+                  disabled={rerunning}
+                  className="flex-1 px-3 py-1.5 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-medium hover:bg-indigo-500/30 transition-colors disabled:opacity-50"
+                >
+                  {rerunning ? "Re-running…" : "Re-run Analysis"}
+                </button>
+                <button
+                  onClick={() => setEditingFacts(false)}
+                  className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-zinc-500 text-[10px] hover:text-zinc-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           )}
-          <p className="text-xs text-zinc-600 mt-1.5">{subjectData?.summary}</p>
         </div>
       </div>
 

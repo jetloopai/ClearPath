@@ -1,4 +1,4 @@
-export type ProviderName = 'rentcast' | 'attom' | 'manual' | 'formula' | 'legacy' | 'stub'
+export type ProviderName = 'rentcast' | 'attom' | 'realtyinus' | 'manual' | 'formula' | 'legacy' | 'stub'
 
 export interface ProviderSelectionPolicy {
   subjectFacts: ProviderName
@@ -20,6 +20,8 @@ export function getProviderLabel(provider: ProviderName | string | null | undefi
       return 'RentCast'
     case 'attom':
       return 'ATTOM'
+    case 'realtyinus':
+      return 'Realtor.com'
     case 'manual':
       return 'Manual override'
     case 'formula':
