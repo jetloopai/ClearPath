@@ -61,7 +61,11 @@ async function get(
     }
   }
 
-  return { ok: true, status: res.status, json: await res.json() }
+  try {
+    return { ok: true, status: res.status, json: await res.json() }
+  } catch {
+    return { ok: false, status: res.status, json: null, error: 'Realty in US returned non-JSON response' }
+  }
 }
 
 function missing(error: string): ProviderResult<CanonicalPropertyRecord> {

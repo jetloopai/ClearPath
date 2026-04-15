@@ -205,11 +205,6 @@ async function upsertPropertyRecord(address: string, property: PropertyData, isS
     property_type: property.propertyType,
     zestimate: property.valueEstimate ?? property.zestimate,
     is_service_area: isServiceArea,
-    source_subject: property.subjectProvider,
-    source_value: property.valueProvider,
-    source_rent: property.rentProvider,
-    source_comps: property.compsProvider,
-    source_updated_at: new Date().toISOString(),
     data: {
       rawProviders: property.rawProviders,
       providerTrace: property.providerTrace,
@@ -220,6 +215,10 @@ async function upsertPropertyRecord(address: string, property: PropertyData, isS
       nearbyRentCount: property.nearbyRents.length,
       compsCount: property.comps.length,
       providerPropertyId: property.providerPropertyId,
+      subjectProvider: property.subjectProvider,
+      valueProvider: property.valueProvider,
+      rentProvider: property.rentProvider,
+      compsProvider: property.compsProvider,
     },
   }
 

@@ -361,13 +361,21 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
   const hasRapidApiKey = Boolean(getRapidApiZillowKey())
 
   if (hasRapidApiKey) {
-    const realtyInUS = new RealtyInUSProvider()
-    const realtyResult = await realtyInUS.lookupSubject(address)
-    if (realtyResult.status === 'success' && realtyResult.data) {
-      subjectResult = realtyResult
-      subjectProviderName = 'realtyinus'
-    } else {
-      // Fall back to RentCast for subject facts
+    try {
+      const realtyInUS = new RealtyInUSProvider()
+      const realtyResult = await realtyInUS.lookupSubject(address)
+      if (realtyResult.status === 'success' && realtyResult.data) {
+        subjectResult = realtyResult
+        subjectProviderName = 'realtyinus'
+      } else {
+        // Realty in US missed — fall back to RentCast
+        subjectResult = cached.subject
+          ? rentCast.lookupSubjectFromCache(cached.subject)
+          : await rentCast.lookupSubject(address)
+        subjectProviderName = 'rentcast'
+      }
+    } catch {
+      // Unexpected error from Realty in US — fall back to RentCast silently
       subjectResult = cached.subject
         ? rentCast.lookupSubjectFromCache(cached.subject)
         : await rentCast.lookupSubject(address)
