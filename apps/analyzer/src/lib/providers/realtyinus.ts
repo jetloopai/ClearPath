@@ -83,8 +83,15 @@ export class RealtyInUSProvider implements PropertyProvider {
     const key = getRapidApiZillowKey()
     if (!key) return err('RAPIDAPI_ZILLOW_KEY not configured')
 
+    // Strip Google Places artifacts that confuse Realtor.com autocomplete:
+    // ", USA" suffix and any trailing country token
+    const cleanedAddress = address
+      .replace(/,?\s*USA\s*$/i, '')
+      .replace(/,?\s*United States\s*$/i, '')
+      .trim()
+
     // Step 1: Auto-complete to resolve address → property_id
-    const acRes = await get('/locations/auto-complete', { input: address }, key)
+    const acRes = await get('/locations/auto-complete', { input: cleanedAddress }, key)
     if (!acRes.ok) {
       return acRes.status === 404 ? missing('Address not found') : err(acRes.error ?? 'Auto-complete failed')
     }
@@ -98,7 +105,7 @@ export class RealtyInUSProvider implements PropertyProvider {
       ?? suggestions.map(s => asRecord(s)).find(s => s?.mpr_id || s?.property_id)
       ?? asRecord(suggestions[0])
 
-    if (!suggestion) return missing('No property suggestion returned from auto-complete')
+    if (!suggestion) return missing(`No property suggestion returned for "${cleanedAddress}" (${suggestions.length} results, none matched)`)
 
     const propertyId = toStr(suggestion.mpr_id) ?? toStr(suggestion.property_id)
 
@@ -110,7 +117,7 @@ export class RealtyInUSProvider implements PropertyProvider {
     const acCounty = toStr(suggestion.county) ?? ''
     const acZip = toStr(suggestion.postal_code) ?? ''
 
-    if (!propertyId) return missing('Auto-complete did not return a property_id')
+    if (!propertyId) return missing(`Auto-complete returned ${suggestions.length} suggestions for "${cleanedAddress}" but none had a property_id (types: ${suggestions.map(s => asRecord(s)?._type).join(', ')})`)
 
     // Step 2: Full property detail
     const detailRes = await get('/properties/v2/detail', { property_id: propertyId }, key)
