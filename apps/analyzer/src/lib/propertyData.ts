@@ -359,6 +359,11 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
   let subjectProviderName: ProviderName
 
   const hasRapidApiKey = Boolean(getRapidApiZillowKey())
+  let realtyInUSFallbackReason: string | null = null
+
+  if (!hasRapidApiKey) {
+    realtyInUSFallbackReason = 'RAPIDAPI_ZILLOW_KEY not set in environment'
+  }
 
   if (hasRapidApiKey) {
     try {
@@ -368,14 +373,14 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
         subjectResult = realtyResult
         subjectProviderName = 'realtyinus'
       } else {
-        // Realty in US missed — fall back to RentCast
+        realtyInUSFallbackReason = `Realty in US ${realtyResult.status}: ${realtyResult.error ?? 'no data returned'}`
         subjectResult = cached.subject
           ? rentCast.lookupSubjectFromCache(cached.subject)
           : await rentCast.lookupSubject(address)
         subjectProviderName = 'rentcast'
       }
-    } catch {
-      // Unexpected error from Realty in US — fall back to RentCast silently
+    } catch (e) {
+      realtyInUSFallbackReason = `Realty in US threw: ${e instanceof Error ? e.message : String(e)}`
       subjectResult = cached.subject
         ? rentCast.lookupSubjectFromCache(cached.subject)
         : await rentCast.lookupSubject(address)
@@ -468,7 +473,10 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
       },
     },
     providerTrace: trace,
-    providerWarnings: buildProviderWarnings(trace),
+    providerWarnings: [
+      ...buildProviderWarnings(trace),
+      ...(realtyInUSFallbackReason ? [`[RealtyInUS fallback] ${realtyInUSFallbackReason}`] : []),
+    ],
     isStubData: false,
   }
 }
