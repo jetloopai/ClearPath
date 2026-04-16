@@ -17,10 +17,11 @@
 
 html {
   scroll-behavior: smooth;
+  background-color: #050505;
 }
 
 body {
-  background: radial-gradient(ellipse at 50% 0%, #0a0a1a 0%, #050505 70%);
+  background: radial-gradient(ellipse at 50% 0%, #0a0a1a 0%, #050505 70%) fixed;
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -37,7 +38,7 @@ body {
 }
 .bg-noise::before {
   content: "";
-  position: absolute;
+  position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
   pointer-events: none;
   z-index: 1;
