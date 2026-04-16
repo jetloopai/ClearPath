@@ -18,13 +18,16 @@
 html {
   scroll-behavior: smooth;
   background-color: #050505;
+  overscroll-behavior: none;
 }
 
 body {
   background: radial-gradient(ellipse at 50% 0%, #0a0a1a 0%, #050505 70%) fixed;
+  background-color: #050505;
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
 }
 
 ::selection {
