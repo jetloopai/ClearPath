@@ -40,7 +40,7 @@ export function getRentCastApiKey(): string | null {
 }
 
 export function getRapidApiZillowKey(): string | null {
-  return process.env.RAPIDAPI_ZILLOW_KEY?.trim() || null
+  return process.env.REALTYUS_API_KEY?.trim() || process.env.RAPIDAPI_ZILLOW_KEY?.trim() || null
 }
 
 export function isProviderEnabled(provider: ProviderName): boolean {
