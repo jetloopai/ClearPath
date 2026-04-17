@@ -51,13 +51,16 @@ async function get(
 
   if (!res.ok) {
     const thrown = res as Response & { error?: unknown }
+    if (thrown.error instanceof Error) {
+      return { ok: false, status: res.status, json: null, error: thrown.error.message }
+    }
+    let body = ''
+    try { body = await (res as Response).text() } catch { /* ignore */ }
     return {
       ok: false,
       status: res.status,
       json: null,
-      error: thrown.error instanceof Error
-        ? thrown.error.message
-        : `Realty in US request failed with ${res.status}`,
+      error: `Realty in US ${res.status}${body ? `: ${body.slice(0, 300)}` : ''}`,
     }
   }
 
