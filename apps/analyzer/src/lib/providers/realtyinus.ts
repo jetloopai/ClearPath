@@ -94,7 +94,7 @@ export class RealtyInUSProvider implements PropertyProvider {
       .trim()
 
     // Step 1: Auto-complete to resolve address → property_id
-    const acRes = await get('/locations/v2/auto-complete', { input: cleanedAddress }, key)
+    const acRes = await get('/locations/auto-complete', { input: cleanedAddress }, key)
     if (!acRes.ok) {
       return acRes.status === 404 ? missing('Address not found') : err(acRes.error ?? 'Auto-complete failed')
     }
