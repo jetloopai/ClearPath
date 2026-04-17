@@ -369,36 +369,36 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
   let usedRapidApi = false
 
   if (hasRapidApiKey) {
-    // 1) Try Realty in US (Realtor.com / MLS)
+    // 1) Try Zillow Scraper API (primary — reliable MLS data)
     try {
-      const realtyInUS = new RealtyInUSProvider()
-      const realtyResult = await realtyInUS.lookupSubject(address)
-      if (realtyResult.status === 'success' && realtyResult.data) {
-        subjectResult = realtyResult
-        subjectProviderName = 'realtyinus'
+      const zillow = new LegacyZillowProvider()
+      const zillowResult = await zillow.lookupSubject(address)
+      if (zillowResult.status === 'success' && zillowResult.data) {
+        subjectResult = zillowResult
+        subjectProviderName = 'legacy'
         usedRapidApi = true
       } else {
-        rapidApiFallbackReason = `Realty in US ${realtyResult.status}: ${realtyResult.error ?? 'no data returned'}`
+        rapidApiFallbackReason = `Zillow Scraper ${zillowResult.status}: ${zillowResult.error ?? 'no data'}`
       }
     } catch (e) {
-      rapidApiFallbackReason = `Realty in US threw: ${e instanceof Error ? e.message : String(e)}`
+      rapidApiFallbackReason = `Zillow Scraper threw: ${e instanceof Error ? e.message : String(e)}`
     }
 
-    // 2) Fall back to Zillow Scraper API
+    // 2) Fall back to Realty in US
     if (!usedRapidApi) {
       try {
-        const zillow = new LegacyZillowProvider()
-        const zillowResult = await zillow.lookupSubject(address)
-        if (zillowResult.status === 'success' && zillowResult.data) {
-          subjectResult = zillowResult
-          subjectProviderName = 'legacy'
+        const realtyInUS = new RealtyInUSProvider()
+        const realtyResult = await realtyInUS.lookupSubject(address)
+        if (realtyResult.status === 'success' && realtyResult.data) {
+          subjectResult = realtyResult
+          subjectProviderName = 'realtyinus'
           usedRapidApi = true
-          rapidApiFallbackReason = `${rapidApiFallbackReason} → fell back to Zillow Scraper`
+          rapidApiFallbackReason = `${rapidApiFallbackReason} → fell back to Realty in US`
         } else {
-          rapidApiFallbackReason = `${rapidApiFallbackReason} → Zillow Scraper ${zillowResult.status}: ${zillowResult.error ?? 'no data'}`
+          rapidApiFallbackReason = `${rapidApiFallbackReason} → Realty in US ${realtyResult.status}: ${realtyResult.error ?? 'no data'}`
         }
       } catch (e) {
-        rapidApiFallbackReason = `${rapidApiFallbackReason} → Zillow Scraper threw: ${e instanceof Error ? e.message : String(e)}`
+        rapidApiFallbackReason = `${rapidApiFallbackReason} → Realty in US threw: ${e instanceof Error ? e.message : String(e)}`
       }
     }
   }
