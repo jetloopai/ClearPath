@@ -415,7 +415,10 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
   }
 
   if (!subjectResult.data) {
-    const reason = subjectResult.error ?? 'Subject lookup failed'
+    const rentcastErr = subjectResult.error ?? 'no data'
+    const reason = rapidApiFallbackReason
+      ? `${rapidApiFallbackReason} → RentCast: ${rentcastErr}`
+      : rentcastErr
     const stubTrace: ProviderTrace = {
       subjectFacts: toProviderTraceDomain(policy.subjectFacts, [subjectProviderName, 'rentcast'], null, subjectResult.status === 'error' ? 'error' : 'missing', reason),
       value: toProviderTraceDomain(policy.value, ['rentcast'], null, 'fallback', 'Subject lookup failed before value estimate'),
