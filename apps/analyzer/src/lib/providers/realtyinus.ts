@@ -9,8 +9,8 @@ import type {
   ProviderResult,
 } from '@/lib/propertyData'
 
-const BASE_URL = 'https://realtor.p.rapidapi.com'
-const HOST = 'realtor.p.rapidapi.com'
+const BASE_URL = 'https://realty-in-us.p.rapidapi.com'
+const HOST = 'realty-in-us.p.rapidapi.com'
 
 type JsonRecord = Record<string, unknown>
 
@@ -94,7 +94,7 @@ export class RealtyInUSProvider implements PropertyProvider {
       .trim()
 
     // Step 1: Auto-complete to resolve address → property_id
-    const acRes = await get('/locations/auto-complete', { input: cleanedAddress }, key)
+    const acRes = await get('/locations/v2/auto-complete', { input: cleanedAddress }, key)
     if (!acRes.ok) {
       return acRes.status === 404 ? missing('Address not found') : err(acRes.error ?? 'Auto-complete failed')
     }
