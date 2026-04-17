@@ -119,8 +119,11 @@ export class RealtyInUSProvider implements PropertyProvider {
 
     if (!propertyId) return missing(`Auto-complete returned ${suggestions.length} suggestions for "${address}" but none had a property_id (types: ${suggestions.map(s => asRecord(s)?.area_type).join(', ')})`)
 
-    // Step 2: Full property detail
-    const detailRes = await get('/properties/v2/detail', { property_id: propertyId }, key)
+    // Step 2: Full property detail — try v2 first, fall back to v3 if v2 returns empty (204)
+    let detailRes = await get('/properties/v2/detail', { property_id: propertyId }, key)
+    if (!detailRes.ok && detailRes.status === 204) {
+      detailRes = await get('/properties/v3/detail', { property_id: propertyId }, key)
+    }
     if (!detailRes.ok) {
       return detailRes.status === 404 ? missing('Property detail not found') : err(detailRes.error ?? 'Detail lookup failed')
     }
