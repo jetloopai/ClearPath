@@ -128,29 +128,76 @@ export class RealtyInUSProvider implements PropertyProvider {
       return detailRes.status === 404 ? missing('Property detail not found') : err(detailRes.error ?? 'Detail lookup failed')
     }
 
-    // Response shape: { properties: [...] } or { properties: {...} }
+    // v3 response: { data: { home: { description, location, property_history, ... } } }
+    // v2 response: { properties: [...] } or { properties: {...} }
     const detailData = asRecord(detailRes.json)
-    const propsRaw = detailData?.properties
-    const prop = asRecord(Array.isArray(propsRaw) ? propsRaw[0] : propsRaw) ?? asRecord(detailData)
+    const isV3 = Boolean(asRecord(asRecord(detailData?.data)?.home))
 
-    if (!prop) return missing('Property detail response was empty')
+    let sqft: number | null
+    let beds: number | null
+    let baths: number | null
+    let yearBuilt: number | null
+    let propType: string
+    let lat: number | null
+    let lng: number | null
+    let city: string
+    let state: string
+    let county: string
+    let zip: string
+    let line1: string | null
 
-    const addr = asRecord(prop.address)
-    const buildingSize = asRecord(prop.building_size)
+    if (isV3) {
+      const home = asRecord(asRecord(detailData?.data)?.home)
+      if (!home) return missing('Property detail response was empty')
 
-    const sqft = toNum(buildingSize?.size) ?? toNum(prop.sqft) ?? toNum(prop.building_size)
-    const beds = toNum(prop.beds)
-    const baths = toNum(prop.baths_full) ?? toNum(prop.baths)
-    const yearBuilt = toNum(prop.year_built)
-    const propType = toStr(prop.prop_type) ?? 'single_family'
+      const desc = asRecord(home.description)
+      const loc = asRecord(home.location)
+      const addr = asRecord(loc?.address)
+      const coord = asRecord(addr?.coordinate)
 
-    const lat = toNum(addr?.lat) ?? acLat
-    const lng = toNum(addr?.lon) ?? toNum(addr?.lng) ?? acLng
-    const city = toStr(addr?.city) ?? acCity
-    const state = toStr(addr?.state_code) ?? acState
-    const county = toStr(addr?.county) ?? acCounty
-    const zip = toStr(addr?.postal_code) ?? acZip
-    const line1 = toStr(addr?.line)
+      beds = toNum(desc?.beds)
+      baths = toNum(desc?.baths)
+      yearBuilt = toNum(desc?.year_built)
+      propType = toStr(desc?.type) ?? toStr(desc?.sub_type) ?? 'single_family'
+
+      // sqft from current description; fall back to most recent non-null value in property_history
+      sqft = toNum(desc?.sqft)
+      if (!sqft) {
+        for (const entry of asArray(home.property_history)) {
+          const histSqft = toNum(asRecord(asRecord(asRecord(entry)?.listing)?.description)?.sqft)
+          if (histSqft) { sqft = histSqft; break }
+        }
+      }
+
+      lat = toNum(coord?.lat) ?? acLat
+      lng = toNum(coord?.lon) ?? acLng
+      city = toStr(addr?.city) ?? acCity
+      state = toStr(addr?.state_code) ?? acState
+      county = acCounty // v3 only exposes fips_code, not county name
+      zip = toStr(addr?.postal_code) ?? acZip
+      line1 = toStr(addr?.line)
+    } else {
+      const propsRaw = detailData?.properties
+      const prop = asRecord(Array.isArray(propsRaw) ? propsRaw[0] : propsRaw) ?? asRecord(detailData)
+      if (!prop) return missing('Property detail response was empty')
+
+      const addr = asRecord(prop.address)
+      const buildingSize = asRecord(prop.building_size)
+
+      sqft = toNum(buildingSize?.size) ?? toNum(prop.sqft)
+      beds = toNum(prop.beds)
+      baths = toNum(prop.baths_full) ?? toNum(prop.baths)
+      yearBuilt = toNum(prop.year_built)
+      propType = toStr(prop.prop_type) ?? 'single_family'
+
+      lat = toNum(addr?.lat) ?? acLat
+      lng = toNum(addr?.lon) ?? toNum(addr?.lng) ?? acLng
+      city = toStr(addr?.city) ?? acCity
+      state = toStr(addr?.state_code) ?? acState
+      county = toStr(addr?.county) ?? acCounty
+      zip = toStr(addr?.postal_code) ?? acZip
+      line1 = toStr(addr?.line)
+    }
 
     const trimmed = { propertyId, beds, baths, sqft, yearBuilt, propType, city, state, county, zip, lat, lng }
 
