@@ -96,7 +96,7 @@ export class RealtyInUSProvider implements PropertyProvider {
       .trim()
 
     // Step 1: Auto-complete to resolve address → property_id
-    const acRes = await get('/locations/auto-complete', { input: cleanedAddress }, key)
+    const acRes = await get('/locations/v2/auto-complete', { input: cleanedAddress }, key)
     if (!acRes.ok) {
       return acRes.status === 404 ? missing('Address not found') : err(acRes.error ?? 'Auto-complete failed')
     }
@@ -104,9 +104,10 @@ export class RealtyInUSProvider implements PropertyProvider {
     const acData = asRecord(acRes.json)
     const suggestions = asArray(acData?.autocomplete)
 
-    // Prefer suggestions with a property ID (type "address") over city/zip suggestions
+    // Prefer address-type suggestions with a property ID over city/zip suggestions
+    // v2 response uses area_type (not _type) and centroid (not lat/lng)
     const suggestion =
-      suggestions.map(s => asRecord(s)).find(s => s?._type === 'address' && (s?.mpr_id || s?.property_id))
+      suggestions.map(s => asRecord(s)).find(s => s?.area_type === 'address' && (s?.mpr_id || s?.property_id))
       ?? suggestions.map(s => asRecord(s)).find(s => s?.mpr_id || s?.property_id)
       ?? asRecord(suggestions[0])
 
@@ -115,14 +116,15 @@ export class RealtyInUSProvider implements PropertyProvider {
     const propertyId = toStr(suggestion.mpr_id) ?? toStr(suggestion.property_id)
 
     // Capture whatever location data the autocomplete has (used as fallback)
-    const acLat = toNum(suggestion.lat)
-    const acLng = toNum(suggestion.lng)
+    const centroid = asRecord(suggestion.centroid)
+    const acLat = toNum(centroid?.lat) ?? toNum(suggestion.lat)
+    const acLng = toNum(centroid?.lon) ?? toNum(centroid?.lng) ?? toNum(suggestion.lng)
     const acCity = toStr(suggestion.city) ?? 'Unknown'
     const acState = toStr(suggestion.state_code) ?? toStr(suggestion.state) ?? 'Unknown'
     const acCounty = toStr(suggestion.county) ?? ''
     const acZip = toStr(suggestion.postal_code) ?? ''
 
-    if (!propertyId) return missing(`Auto-complete returned ${suggestions.length} suggestions for "${cleanedAddress}" but none had a property_id (types: ${suggestions.map(s => asRecord(s)?._type).join(', ')})`)
+    if (!propertyId) return missing(`Auto-complete returned ${suggestions.length} suggestions for "${cleanedAddress}" but none had a property_id (types: ${suggestions.map(s => asRecord(s)?.area_type).join(', ')})`)
 
     // Step 2: Full property detail
     const detailRes = await get('/properties/v2/detail', { property_id: propertyId }, key)
