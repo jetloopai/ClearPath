@@ -1,6 +1,7 @@
-import { type ProviderName, providerPolicies, type ProviderSelectionPolicy, getRapidApiZillowKey } from '@/lib/providers/config'
+import { type ProviderName, providerPolicies, type ProviderSelectionPolicy, getRapidApiZillowKey, getProviderLabel } from '@/lib/providers/config'
 import { RentCastProvider } from '@/lib/providers/rentcast'
 import { RealtyInUSProvider } from '@/lib/providers/realtyinus'
+import { LegacyZillowProvider } from '@/lib/providers/legacy-zillow'
 import { getCachedRentCast, setCachedRentCast } from '@/lib/providers/rentcastCache'
 
 export interface CompListing {
@@ -354,39 +355,56 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
   // Check DB cache for RentCast value/rent (still used regardless of subject provider)
   const cached = await getCachedRentCast(address)
 
-  // ── Subject facts: try Realty in US first (MLS-sourced), fall back to RentCast ──
-  let subjectResult: Awaited<ReturnType<typeof rentCast.lookupSubject>>
-  let subjectProviderName: ProviderName
+  // ── Subject facts: RealtyInUS → Zillow Scraper → RentCast ──
+  let subjectResult: Awaited<ReturnType<typeof rentCast.lookupSubject>> = { provider: 'rentcast', status: 'missing', error: 'not resolved' }
+  let subjectProviderName: ProviderName = 'rentcast'
 
   const hasRapidApiKey = Boolean(getRapidApiZillowKey())
-  let realtyInUSFallbackReason: string | null = null
+  let rapidApiFallbackReason: string | null = null
 
   if (!hasRapidApiKey) {
-    realtyInUSFallbackReason = 'RAPIDAPI_ZILLOW_KEY not set in environment'
+    rapidApiFallbackReason = 'RAPIDAPI_ZILLOW_KEY not set in environment'
   }
 
+  let usedRapidApi = false
+
   if (hasRapidApiKey) {
+    // 1) Try Realty in US (Realtor.com / MLS)
     try {
       const realtyInUS = new RealtyInUSProvider()
       const realtyResult = await realtyInUS.lookupSubject(address)
       if (realtyResult.status === 'success' && realtyResult.data) {
         subjectResult = realtyResult
         subjectProviderName = 'realtyinus'
+        usedRapidApi = true
       } else {
-        realtyInUSFallbackReason = `Realty in US ${realtyResult.status}: ${realtyResult.error ?? 'no data returned'}`
-        subjectResult = cached.subject
-          ? rentCast.lookupSubjectFromCache(cached.subject)
-          : await rentCast.lookupSubject(address)
-        subjectProviderName = 'rentcast'
+        rapidApiFallbackReason = `Realty in US ${realtyResult.status}: ${realtyResult.error ?? 'no data returned'}`
       }
     } catch (e) {
-      realtyInUSFallbackReason = `Realty in US threw: ${e instanceof Error ? e.message : String(e)}`
-      subjectResult = cached.subject
-        ? rentCast.lookupSubjectFromCache(cached.subject)
-        : await rentCast.lookupSubject(address)
-      subjectProviderName = 'rentcast'
+      rapidApiFallbackReason = `Realty in US threw: ${e instanceof Error ? e.message : String(e)}`
     }
-  } else {
+
+    // 2) Fall back to Zillow Scraper API
+    if (!usedRapidApi) {
+      try {
+        const zillow = new LegacyZillowProvider()
+        const zillowResult = await zillow.lookupSubject(address)
+        if (zillowResult.status === 'success' && zillowResult.data) {
+          subjectResult = zillowResult
+          subjectProviderName = 'legacy'
+          usedRapidApi = true
+          rapidApiFallbackReason = `${rapidApiFallbackReason} → fell back to Zillow Scraper`
+        } else {
+          rapidApiFallbackReason = `${rapidApiFallbackReason} → Zillow Scraper ${zillowResult.status}: ${zillowResult.error ?? 'no data'}`
+        }
+      } catch (e) {
+        rapidApiFallbackReason = `${rapidApiFallbackReason} → Zillow Scraper threw: ${e instanceof Error ? e.message : String(e)}`
+      }
+    }
+  }
+
+  // 3) Final fallback: RentCast
+  if (!usedRapidApi) {
     subjectResult = cached.subject
       ? rentCast.lookupSubjectFromCache(cached.subject)
       : await rentCast.lookupSubject(address)
@@ -443,7 +461,7 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
       [subjectProviderName],
       subjectResult.data ? subjectProviderName : null,
       subjectResult.data?.sqft ? 'success' : 'missing',
-      subjectResult.data?.sqft ? null : `${subjectProviderName === 'realtyinus' ? 'Realtor.com' : 'RentCast'} record did not include square footage`,
+      subjectResult.data?.sqft ? null : `${getProviderLabel(subjectProviderName)} record did not include square footage`,
     ),
     value: toProviderTraceDomain(policy.value, [valueResult.provider], valueResult.data ? valueResult.provider : null, valueResult.status, valueResult.data ? null : (valueResult.error ?? 'Provider AVM unavailable')),
     rent: toProviderTraceDomain(policy.rent, [rentResult.provider], rentResult.data ? rentResult.provider : null, rentResult.status, rentResult.data ? null : (rentResult.error ?? 'Provider rent estimate unavailable')),
@@ -475,7 +493,7 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
     providerTrace: trace,
     providerWarnings: [
       ...buildProviderWarnings(trace),
-      ...(realtyInUSFallbackReason ? [`[RealtyInUS fallback] ${realtyInUSFallbackReason}`] : []),
+      ...(rapidApiFallbackReason ? [`[RapidAPI fallback] ${rapidApiFallbackReason}`] : []),
     ],
     isStubData: false,
   }
