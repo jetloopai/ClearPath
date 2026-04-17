@@ -350,6 +350,9 @@ function buildCanonicalStub(address: string): CanonicalPropertyData {
 }
 
 export async function getCanonicalPropertyData(address: string, policy: ProviderSelectionPolicy = providerPolicies): Promise<CanonicalPropertyData> {
+  // Strip Google Places country suffix — all providers expect a US-only address format
+  address = address.replace(/,?\s*USA\s*$/i, '').replace(/,?\s*United States\s*$/i, '').trim()
+
   const rentCast = new RentCastProvider()
 
   // Check DB cache for RentCast value/rent (still used regardless of subject provider)
