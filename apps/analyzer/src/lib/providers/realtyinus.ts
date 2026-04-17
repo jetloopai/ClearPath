@@ -67,7 +67,9 @@ async function get(
   try {
     return { ok: true, status: res.status, json: await res.json() }
   } catch {
-    return { ok: false, status: res.status, json: null, error: 'Realty in US returned non-JSON response' }
+    let body = ''
+    try { body = await (res as Response).text() } catch { /* ignore */ }
+    return { ok: false, status: res.status, json: null, error: `Realty in US non-JSON (${res.status}): ${body.slice(0, 400)}` }
   }
 }
 
