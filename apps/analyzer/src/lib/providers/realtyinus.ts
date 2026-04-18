@@ -89,22 +89,33 @@ export class RealtyInUSProvider implements PropertyProvider {
     if (!key) return err('RAPIDAPI_ZILLOW_KEY not configured')
 
     // Step 1: Auto-complete to resolve address → property_id
-    const acRes = await get('/locations/v2/auto-complete', { input: address }, key)
+    // Helper: pick best address-type suggestion with an mpr_id
+    const pickSuggestion = (list: unknown[]) =>
+      list.map(s => asRecord(s)).find(s => s?.area_type === 'address' && (s?.mpr_id || s?.property_id))
+      ?? list.map(s => asRecord(s)).find(s => s?.mpr_id || s?.property_id)
+
+    let acRes = await get('/locations/v2/auto-complete', { input: address }, key)
     if (!acRes.ok) {
       return acRes.status === 404 ? missing('Address not found') : err(acRes.error ?? 'Auto-complete failed')
     }
 
-    const acData = asRecord(acRes.json)
-    const suggestions = asArray(acData?.autocomplete)
+    let suggestions = asArray(asRecord(acRes.json)?.autocomplete)
+    let suggestion = pickSuggestion(suggestions)
 
-    // Prefer address-type suggestions with a property ID over city/zip suggestions
-    // v2 response uses area_type (not _type) and centroid (not lat/lng)
-    const suggestion =
-      suggestions.map(s => asRecord(s)).find(s => s?.area_type === 'address' && (s?.mpr_id || s?.property_id))
-      ?? suggestions.map(s => asRecord(s)).find(s => s?.mpr_id || s?.property_id)
-      ?? asRecord(suggestions[0])
+    // Retry without zip code — often produces a property-level match when the full address doesn't
+    if (!suggestion) {
+      const withoutZip = address.replace(/,?\s*\d{5}(-\d{4})?\s*$/, '').trim()
+      if (withoutZip !== address) {
+        const acRes2 = await get('/locations/v2/auto-complete', { input: withoutZip }, key)
+        if (acRes2.ok) {
+          const suggestions2 = asArray(asRecord(acRes2.json)?.autocomplete)
+          suggestion = pickSuggestion(suggestions2)
+          if (suggestion) suggestions = suggestions2
+        }
+      }
+    }
 
-    if (!suggestion) return missing(`No property suggestion returned for "${address}" (${suggestions.length} results, none matched)`)
+    if (!suggestion) return missing(`Auto-complete returned no property-level result for "${address}" (types: ${suggestions.map(s => asRecord(s)?.area_type).join(', ')})`)
 
     const propertyId = toStr(suggestion.mpr_id) ?? toStr(suggestion.property_id)
 
