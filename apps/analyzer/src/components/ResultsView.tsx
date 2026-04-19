@@ -2125,16 +2125,7 @@ export default function ResultsView() {
                           <td className="py-2.5 pr-4 text-zinc-400 text-xs" title={comp.address || "No address data"}>
                             {comp.address ? (
                               <a
-                                href={comp.url || (() => {
-                                  // Build a Redfin address URL: /STATE/City-Slug/Street-Slug-ZIP/
-                                  const parts = comp.address.split(',').map((s: string) => s.trim())
-                                  const street = (parts[0] || '').replace(/\s+/g, '-')
-                                  const city = (parts[1] || '').replace(/\s+/g, '-')
-                                  const stateZip = (parts[2] || '').trim().split(/\s+/)
-                                  const state = stateZip[0] || ''
-                                  const zip = stateZip[1] || ''
-                                  return `https://www.redfin.com/${state}/${city}/${street}-${zip}/`
-                                })()}
+                                href={comp.url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(comp.address)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="max-w-[180px] truncate block hover:text-indigo-400 transition-colors underline-offset-2 hover:underline"
