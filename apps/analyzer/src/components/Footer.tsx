@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import { NewsletterSignup } from "./NewsletterSignup";
 
 export function Footer() {
   return (
@@ -15,6 +16,7 @@ export function Footer() {
           <Link href="/terms" className="hover:text-zinc-300 transition-colors">Terms of Use</Link>
           <Link href="/privacy" className="hover:text-zinc-300 transition-colors">Privacy</Link>
         </div>
+        <NewsletterSignup />
       </div>
     </footer>
   );

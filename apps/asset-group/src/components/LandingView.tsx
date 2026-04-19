@@ -1,9 +1,92 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { UserX, TrendingUp, Clock, MessageSquareOff, Hammer, Key, BarChart3 } from "lucide-react";
+
+function ContactForm() {
+  const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', message: '' });
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim()) return;
+    setStatus('loading');
+    setErrorMsg('');
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error ?? 'Something went wrong');
+      }
+      setStatus('success');
+    } catch (err: any) {
+      setErrorMsg(err.message ?? 'Something went wrong. Try again.');
+      setStatus('error');
+    }
+  };
+
+  if (status === 'success') {
+    return (
+      <div className="text-center py-12">
+        <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-4">
+          <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
+        </div>
+        <p className="text-lg font-medium text-foreground mb-2">We'll be in touch within 24 hours.</p>
+        <p className="text-sm text-zinc-500">Check your email for a confirmation.</p>
+      </div>
+    );
+  }
+
+  const inputClass = "w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50 transition-colors";
+
+  return (
+    <form onSubmit={submit} className="space-y-4 text-left max-w-lg mx-auto">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs text-zinc-500 mb-1.5 block">Name <span className="text-red-500">*</span></label>
+          <input value={form.name} onChange={set('name')} required placeholder="John Smith" className={inputClass} />
+        </div>
+        <div>
+          <label className="text-xs text-zinc-500 mb-1.5 block">Email <span className="text-red-500">*</span></label>
+          <input type="email" value={form.email} onChange={set('email')} required placeholder="you@example.com" className={inputClass} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs text-zinc-500 mb-1.5 block">Phone <span className="text-zinc-700">(optional)</span></label>
+          <input value={form.phone} onChange={set('phone')} placeholder="(312) 555-0100" className={inputClass} />
+        </div>
+        <div>
+          <label className="text-xs text-zinc-500 mb-1.5 block">Deal Address <span className="text-zinc-700">(optional)</span></label>
+          <input value={form.address} onChange={set('address')} placeholder="123 Main St, Chicago, IL" className={inputClass} />
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-zinc-500 mb-1.5 block">Message <span className="text-zinc-700">(optional)</span></label>
+        <textarea value={form.message} onChange={set('message')} rows={3} placeholder="Tell us about the deal — condition, purchase price, strategy..." className={`${inputClass} resize-none`} />
+      </div>
+      {errorMsg && <p className="text-red-400 text-xs">{errorMsg}</p>}
+      <button
+        type="submit"
+        disabled={status === 'loading'}
+        className="w-full py-4 rounded-full bg-foreground text-background font-medium text-sm hover:bg-zinc-200 transition-colors disabled:opacity-50"
+      >
+        {status === 'loading' ? 'Sending…' : 'Submit Inquiry'}
+      </button>
+      <p className="text-xs text-zinc-700 text-center">We respond within 24 hours. Cook County only.</p>
+    </form>
+  );
+}
 
 export default function LandingView() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -190,17 +273,7 @@ export default function LandingView() {
           <h2 className="text-4xl md:text-6xl font-serif text-zinc-500 italic mb-12">
             We handle the execution.
           </h2>
-          <a
-            href="https://calendly.com/placeholder"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-block px-14 py-6 rounded-full bg-foreground text-background text-lg font-medium hover:bg-zinc-200 transition-colors"
-          >
-            Book a Strategy Call
-          </a>
-          <p className="text-sm text-zinc-600 mt-6">
-            Or email us at hello@clearpathassetgroup.com
-          </p>
+          <ContactForm />
         </div>
       </section>
     </div>

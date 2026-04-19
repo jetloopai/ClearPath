@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-server'
+import { sendAnalysisEmail, sendInternalAlert } from '@/lib/email'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -57,6 +58,15 @@ export async function POST(req: NextRequest) {
     console.error('Lead capture error:', error)
     return NextResponse.json({ error: 'Failed to save lead' }, { status: 500 })
   }
+
+  const leadData = { id: data.id, email, address, deal_signal, deal_arv, deal_flip_profit, deal_cash_flow, is_service_area: serviceArea, source: 'analyzer' as const, tags, qualification_score }
+
+  // Fire-and-forget — don't block response on email
+  sendAnalysisEmail(leadData).catch(console.error)
+  if (serviceArea) sendInternalAlert(leadData).catch(console.error)
+
+  // Log email_sent activity
+  supabaseAdmin.from('lead_activity').insert({ lead_id: data.id, type: 'email_sent', notes: 'Template A — analyzer confirmation', created_by: 'system' }).then().catch(console.error)
 
   return NextResponse.json({ id: data.id })
 }
