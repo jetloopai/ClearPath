@@ -185,6 +185,19 @@ export default function ResultsView() {
   const [lineItems, setLineItems] = useState<LineItem[]>(DEFAULT_LINE_ITEMS);
   const lineItemTotal = lineItems.reduce((s, li) => s + (parseInt(li.cost.replace(/[^0-9]/g, ""), 10) || 0), 0);
 
+  // ── Expense overrides (editable in P&L) ──────────────────────────────────────
+  const [expVacancy, setExpVacancy] = useState(0);
+  const [expMgmt, setExpMgmt] = useState(0);
+  const [expMaintenance, setExpMaintenance] = useState(0);
+  const [expCapex, setExpCapex] = useState(0);
+  const [expInsurance, setExpInsurance] = useState(0);
+  const [expTaxes, setExpTaxes] = useState(0);
+  const [editingExpense, setEditingExpense] = useState<string | null>(null);
+  const [expenseInputVal, setExpenseInputVal] = useState("");
+  const [refiClosingCosts, setRefiClosingCosts] = useState(3000);
+  const [isRefiClosingEditing, setIsRefiClosingEditing] = useState(false);
+  const [refiClosingInput, setRefiClosingInput] = useState("3000");
+
   // ── Rehab editor state ────────────────────────────────────────────────────────
   const [customRehab, setCustomRehab] = useState(0);
   const [isRehabEditing, setIsRehabEditing] = useState(false);
@@ -308,6 +321,16 @@ export default function ResultsView() {
         .then(r => r.ok ? r.json() : null)
         .then(nd => { if (nd) setNeighborhoodData(nd); })
         .catch(() => {});
+    }
+
+    // Init expense overrides from server breakdown
+    if (data.breakdown) {
+      setExpVacancy(data.breakdown.vacancy ?? 0);
+      setExpMgmt(data.breakdown.mgmt ?? 0);
+      setExpMaintenance(data.breakdown.maintenance ?? 0);
+      setExpCapex(data.breakdown.capex ?? 0);
+      setExpInsurance(data.breakdown.insurance ?? 0);
+      setExpTaxes(data.breakdown.taxes ?? 0);
     }
 
     // Init rehab state
@@ -701,16 +724,21 @@ export default function ResultsView() {
   const allInCost = (breakdown?.downPayment ?? 0) + (breakdown?.closingCostsBuy ?? 0) + customRehab;
   const effectiveRefiRate = refiRate ?? 0.075;
   const refiLoan = Math.round(results.arv * refiLTV);
-  const cashLeftInDeal = allInCost - refiLoan;  // negative = all cash out
+  const cashLeftInDeal = allInCost + refiClosingCosts - refiLoan;  // negative = all cash out
   const refiMonthlyRate = effectiveRefiRate / 12;
   const refiMortgage = Math.round(
     refiLoan * (refiMonthlyRate * Math.pow(1 + refiMonthlyRate, 360)) /
     (Math.pow(1 + refiMonthlyRate, 360) - 1)
   );
-  const monthlyExpenses =
-    (breakdown?.vacancy ?? 0) + (breakdown?.mgmt ?? 0) +
-    (breakdown?.maintenance ?? 0) + (breakdown?.capex ?? 0) +
-    (breakdown?.insurance ?? 0) + (breakdown?.taxes ?? 0);
+  const monthlyExpenses = expVacancy + expMgmt + expMaintenance + expCapex + expInsurance + expTaxes;
+  const customCashFlow = breakdown ? Math.round(results.rentEstimate - (breakdown.mortgage ?? 0) - monthlyExpenses) : results.monthlyCashFlow;
+  const customTotalCashIn = breakdown ? breakdown.downPayment + breakdown.closingCostsBuy + customRehab : 0;
+  const customCoC = customTotalCashIn > 0 ? Math.round((customCashFlow * 12 / customTotalCashIn) * 1000) / 10 : results.cashOnCash;
+  const expensesModified = breakdown ? (
+    expVacancy !== breakdown.vacancy || expMgmt !== breakdown.mgmt ||
+    expMaintenance !== breakdown.maintenance || expCapex !== breakdown.capex ||
+    expInsurance !== breakdown.insurance || expTaxes !== breakdown.taxes
+  ) : false;
   const postRefiCashFlow = results.rentEstimate - refiMortgage - monthlyExpenses;
   const postRefiCoC = cashLeftInDeal <= 0
     ? Infinity
@@ -1648,19 +1676,63 @@ export default function ResultsView() {
               </div>
 
               <div className="mb-4">
-                <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-2">Expenses</div>
-                {[
-                  { label: "Mortgage (PITI)", value: breakdown.mortgage },
-                  { label: "Vacancy (8%)", value: breakdown.vacancy },
-                  { label: "Property Mgmt (10%)", value: breakdown.mgmt },
-                  { label: "Maintenance (6%)", value: breakdown.maintenance },
-                  { label: "CapEx Reserve (5%)", value: breakdown.capex },
-                  { label: "Insurance", value: breakdown.insurance },
-                  { label: "Property Taxes", value: breakdown.taxes },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex justify-between items-center py-2 border-b border-white/[0.04]">
-                    <span className="text-sm text-zinc-500">{label}</span>
-                    <span className="text-sm text-zinc-400">− {fmt(value)}</span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-600">Expenses</div>
+                  {expensesModified && (
+                    <button
+                      onClick={() => { setExpVacancy(breakdown.vacancy); setExpMgmt(breakdown.mgmt); setExpMaintenance(breakdown.maintenance); setExpCapex(breakdown.capex); setExpInsurance(breakdown.insurance); setExpTaxes(breakdown.taxes); }}
+                      className="text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors underline"
+                    >reset</button>
+                  )}
+                </div>
+
+                {/* Mortgage — read-only (controlled via ConfigModal) */}
+                <div className="flex justify-between items-center py-2 border-b border-white/[0.04]">
+                  <span className="text-sm text-zinc-500">Mortgage (PITI)</span>
+                  <span className="text-sm text-zinc-400">− {fmt(breakdown.mortgage)}</span>
+                </div>
+
+                {/* Editable expense rows */}
+                {([
+                  { key: "vacancy", label: "Vacancy", val: expVacancy, set: setExpVacancy, pct: results.rentEstimate > 0 ? Math.round(expVacancy / results.rentEstimate * 100) : 0 },
+                  { key: "mgmt", label: "Property Mgmt", val: expMgmt, set: setExpMgmt, pct: results.rentEstimate > 0 ? Math.round(expMgmt / results.rentEstimate * 100) : 0 },
+                  { key: "maintenance", label: "Maintenance", val: expMaintenance, set: setExpMaintenance, pct: results.rentEstimate > 0 ? Math.round(expMaintenance / results.rentEstimate * 100) : 0 },
+                  { key: "capex", label: "CapEx Reserve", val: expCapex, set: setExpCapex, pct: results.rentEstimate > 0 ? Math.round(expCapex / results.rentEstimate * 100) : 0 },
+                  { key: "insurance", label: "Insurance", val: expInsurance, set: setExpInsurance, pct: null },
+                  { key: "taxes", label: "Property Taxes", val: expTaxes, set: setExpTaxes, pct: null },
+                ] as { key: string; label: string; val: number; set: (v: number) => void; pct: number | null }[]).map(({ key, label, val, set, pct }) => (
+                  <div key={key} className="flex justify-between items-center py-2 border-b border-white/[0.04] group">
+                    <span className="text-sm text-zinc-500">
+                      {label}{pct !== null && <span className="text-zinc-600 ml-1">({pct}%)</span>}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {editingExpense === key ? (
+                        <input
+                          autoFocus
+                          type="number"
+                          value={expenseInputVal}
+                          onChange={e => setExpenseInputVal(e.target.value)}
+                          onBlur={() => {
+                            const n = Math.round(Number(expenseInputVal));
+                            if (n >= 0 && n < 100000) set(n);
+                            setEditingExpense(null);
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            if (e.key === "Escape") setEditingExpense(null);
+                          }}
+                          className="w-20 bg-transparent border-b border-indigo-400 text-foreground text-sm text-right outline-none"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => { setEditingExpense(key); setExpenseInputVal(String(val)); }}
+                          className="text-sm text-zinc-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
+                        >
+                          − {fmt(val)}
+                          <svg className="w-3 h-3 text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1668,10 +1740,10 @@ export default function ResultsView() {
               <div className="flex justify-between items-center py-3 rounded-xl bg-white/[0.02] px-4">
                 <span className="text-sm font-medium text-zinc-300">Monthly Cash Flow</span>
                 <span className={`text-lg font-serif ${
-                  results.monthlyCashFlow >= 300 ? "text-emerald-400" : results.monthlyCashFlow >= 0 ? "text-amber-400" : "text-red-400"
+                  customCashFlow >= 300 ? "text-emerald-400" : customCashFlow >= 0 ? "text-amber-400" : "text-red-400"
                 }`}>
-                  {results.monthlyCashFlow >= 0 ? "+" : ""}
-                  {fmt(results.monthlyCashFlow)}
+                  {customCashFlow >= 0 ? "+" : ""}
+                  {fmt(customCashFlow)}
                 </span>
               </div>
 
@@ -1695,7 +1767,7 @@ export default function ResultsView() {
                     {fmt(breakdown.downPayment + breakdown.closingCostsBuy + customRehab)}
                   </span>
                   <span className="text-xs text-zinc-600"> · Annual CoC: </span>
-                  <span className="text-xs text-zinc-400 font-medium">{results.cashOnCash}%</span>
+                  <span className="text-xs text-zinc-400 font-medium">{customCoC}%</span>
                 </div>
               </div>
             </div>
@@ -1992,11 +2064,31 @@ export default function ResultsView() {
             {/* BRRRR Waterfall */}
             <div className="mb-6">
               <div className="text-[10px] uppercase tracking-widest text-zinc-600 mb-3">Capital Flow</div>
+              {/* Refi closing costs — editable */}
+              <div className="flex items-center justify-between mb-2 text-xs">
+                <span className="text-zinc-600">Refi closing costs:</span>
+                <div className="flex items-center gap-1.5">
+                  {isRefiClosingEditing ? (
+                    <input autoFocus type="number" value={refiClosingInput}
+                      onChange={e => setRefiClosingInput(e.target.value)}
+                      onBlur={() => { const n = Math.round(Number(refiClosingInput)); if (n >= 0 && n < 50000) setRefiClosingCosts(n); setIsRefiClosingEditing(false); }}
+                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setIsRefiClosingEditing(false); }}
+                      className="w-20 bg-transparent border-b border-indigo-400 text-foreground text-xs text-right outline-none"
+                    />
+                  ) : (
+                    <button onClick={() => { setRefiClosingInput(String(refiClosingCosts)); setIsRefiClosingEditing(true); }}
+                      className="text-zinc-400 hover:text-indigo-300 transition-colors flex items-center gap-1">
+                      {fmt(refiClosingCosts)}
+                      <svg className="w-2.5 h-2.5 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
+                  )}
+                </div>
+              </div>
               <div className="flex items-center gap-2 text-sm">
                 <div className="flex-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
                   <div className="text-[10px] text-zinc-500 mb-0.5">All-In Cost</div>
-                  <div className="font-semibold text-foreground">{fmt(allInCost)}</div>
-                  <div className="text-[10px] text-zinc-600 mt-0.5">Down + Closing + Rehab</div>
+                  <div className="font-semibold text-foreground">{fmt(allInCost + refiClosingCosts)}</div>
+                  <div className="text-[10px] text-zinc-600 mt-0.5">Down + Closing + Rehab + Refi fees</div>
                 </div>
                 <div className="text-zinc-600">→</div>
                 <div className="flex-1 rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 text-center">
@@ -2026,8 +2118,8 @@ export default function ResultsView() {
                   <div className="flex justify-between text-zinc-400">
                     <span>All Expenses</span><span>− {fmt(monthlyExpenses)}/mo</span>
                   </div>
-                  <div className={`flex justify-between font-semibold pt-1 border-t border-white/[0.05] ${results.monthlyCashFlow >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    <span>Cash Flow</span><span>{results.monthlyCashFlow >= 0 ? "+" : ""}{fmt(results.monthlyCashFlow)}/mo</span>
+                  <div className={`flex justify-between font-semibold pt-1 border-t border-white/[0.05] ${customCashFlow >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    <span>Cash Flow</span><span>{customCashFlow >= 0 ? "+" : ""}{fmt(customCashFlow)}/mo</span>
                   </div>
                 </div>
               </div>
