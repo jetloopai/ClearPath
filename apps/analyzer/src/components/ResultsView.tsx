@@ -353,20 +353,20 @@ export default function ResultsView() {
   }, []);
 
   // ── Auth gate logic — runs once analysis is loaded ────────────────────────────
-  // Uses onAuthStateChange instead of getSession() so it fires AFTER Supabase
-  // has finished loading the session from localStorage (INITIAL_SESSION event).
   useEffect(() => {
     if (!analysis) return;
     if ((analysis as any).fromDashboard) return; // already unlocked above
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'INITIAL_SESSION') {
-        // Reliable: fires after client has fully initialized from storage
-        setState(session ? "unlocked" : "gated");
-      }
+    // getSession() is the reliable path — reads from localStorage synchronously
+    // after the Supabase client has initialized. INITIAL_SESSION can be missed
+    // if the client resolves before the listener is attached.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setState(session ? "unlocked" : "gated");
+    });
 
+    // Watch for sign-in events (user signs in from the gate)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // User signed in from the gate — animate out and save
         if (gateRef.current) gsap.to(gateRef.current, { opacity: 0, y: -20, duration: 0.4, ease: "power2.in" });
         if (blurRef.current) gsap.to(blurRef.current, { filter: "blur(0px)", opacity: 1, duration: 1.2, ease: "power2.out", delay: 0.3 });
         setTimeout(() => {
