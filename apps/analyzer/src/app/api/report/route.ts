@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit, getIp } from '@/lib/rateLimit'
 
 const fmt = (v: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v)
@@ -540,6 +541,10 @@ ${(() => {
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  const ip = getIp(req)
+  const { allowed } = checkRateLimit(ip, { windowMs: 60_000, max: 10 })
+  if (!allowed) return NextResponse.json({ error: 'Too many requests. Please wait a minute.' }, { status: 429 })
+
   const body = await req.json()
   const {
     address,

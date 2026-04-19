@@ -26,6 +26,21 @@ const MapProvider = dynamic(
 export const metadata: Metadata = {
   title: "ClearPath Analyzer | Instant Deal Analysis",
   description: "Analyze the deal. ARV, rehab, rent, and profit — instantly. A precision tool for real estate investors.",
+  metadataBase: new URL('https://clearpathanalyzer.com'),
+  openGraph: {
+    title: "ClearPath Analyzer | Instant Deal Analysis",
+    description: "Analyze the deal. ARV, rehab, rent, and profit — instantly.",
+    url: "https://clearpathanalyzer.com",
+    siteName: "ClearPath Analyzer",
+    images: [{ url: "/api/og", width: 1200, height: 630, alt: "ClearPath Analyzer" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ClearPath Analyzer | Instant Deal Analysis",
+    description: "Analyze the deal. ARV, rehab, rent, and profit — instantly.",
+    images: ["/api/og"],
+  },
 };
 
 export default function RootLayout({

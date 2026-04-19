@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit, getIp } from '@/lib/rateLimit'
 import Anthropic from '@anthropic-ai/sdk'
 import type { ImageAnalysisResult } from '@/lib/imageAnalysis'
 
@@ -28,6 +29,10 @@ confidence is "high" if interior photos clearly show condition, "medium" if only
 Only include scopeOfWork items for issues actually visible in the photos. Omit categories that look fine.`
 
 export async function POST(req: NextRequest) {
+  const ip = getIp(req)
+  const { allowed } = checkRateLimit(ip, { windowMs: 60_000, max: 10 })
+  if (!allowed) return NextResponse.json({ error: 'Too many requests. Please wait a minute.' }, { status: 429 })
+
   const { images } = await req.json()
 
   if (!images || !Array.isArray(images) || images.length === 0) {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit, getIp } from '@/lib/rateLimit'
 import { supabaseAdmin } from '@/lib/supabase-server'
 import { calculateCompsArvDetails, fetchPropertyData, medianRent } from '@/lib/propertyData'
 import type { AnalysisResults } from '@/lib/calculations'
@@ -275,6 +276,10 @@ async function insertAnalysisWithCompatibility(payload: Record<string, unknown>)
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getIp(req)
+  const { allowed } = checkRateLimit(ip, { windowMs: 60_000, max: 5 })
+  if (!allowed) return NextResponse.json({ error: 'Too many requests. Please wait a minute.' }, { status: 429 })
+
   // ── Auth + credit check (before any expensive work) ──────────────────────
   // No token = guest run: full analysis but not saved to DB, shown behind email gate on results page
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
