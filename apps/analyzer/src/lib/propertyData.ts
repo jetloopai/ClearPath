@@ -414,6 +414,21 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
     subjectProviderName = 'rentcast'
   }
 
+  // Supplement missing sqft from RentCast when MLS provider found the property but has no sqft
+  if (usedRapidApi && subjectResult.data && !subjectResult.data.sqft) {
+    try {
+      const rcSupplement = cached.subject
+        ? rentCast.lookupSubjectFromCache(cached.subject)
+        : await rentCast.lookupSubject(address)
+      if (rcSupplement.status === 'success' && rcSupplement.data?.sqft) {
+        subjectResult = {
+          ...subjectResult,
+          data: { ...subjectResult.data, sqft: rcSupplement.data.sqft },
+        }
+      }
+    } catch { /* sqft stays null — user will be prompted */ }
+  }
+
   if (!subjectResult.data) {
     const rentcastErr = subjectResult.error ?? 'no data'
     const reason = rapidApiFallbackReason
