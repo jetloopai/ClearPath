@@ -240,6 +240,7 @@ export function ConfigModal({ address, county, onClose }: ConfigModalProps) {
       }));
 
       router.push("/results");
+      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setLoading(false);

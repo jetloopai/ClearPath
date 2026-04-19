@@ -2361,45 +2361,35 @@ export default function ResultsView() {
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
             <div className="relative z-10 glass-panel rounded-[2rem] p-10 max-w-md w-full text-center">
               <Lock className="w-8 h-8 text-indigo-400 mx-auto mb-4" />
-              <h3 className="text-xl font-serif text-foreground mb-2">Unlock the Full Deal Breakdown</h3>
+              <h3 className="text-2xl font-serif text-foreground mb-2">Unlock the Full Deal Breakdown</h3>
               <p className="text-sm text-zinc-400 mb-6">
-                See cash flow, flip waterfall, comps, and your MAO — and save this deal to your account.
+                Enter your email to see exact monthly cash flow, net flip profit, and your Maximum Allowable Offer (MAO).
               </p>
 
-              {/* Primary: Sign in to save */}
-              <button
-                type="button"
-                onClick={() => setShowAuthModal(true)}
-                className="w-full py-4 rounded-full bg-indigo-500 hover:bg-indigo-400 text-white font-medium text-sm transition-colors mb-3"
-              >
-                Sign in to unlock &amp; save deal
-              </button>
-
-              {/* Divider */}
-              <div className="flex items-center gap-3 mb-3">
-                <div className="flex-1 h-px bg-white/[0.06]" />
-                <span className="text-xs text-zinc-600">or</span>
-                <div className="flex-1 h-px bg-white/[0.06]" />
-              </div>
-
-              {/* Secondary: Email-only */}
-              <form onSubmit={handleUnlock} className="space-y-2">
+              <form onSubmit={handleUnlock} className="space-y-3">
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Continue with email only..."
-                  className="w-full bg-white/[0.03] border border-white/[0.08] rounded-full py-3.5 px-6 text-foreground placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/40 transition-colors text-sm"
+                  placeholder="Email address..."
+                  className="w-full bg-white/[0.04] border border-white/[0.10] rounded-2xl py-4 px-6 text-foreground placeholder:text-zinc-500 focus:outline-none focus:border-indigo-500/50 transition-colors text-sm"
                 />
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-3.5 rounded-full border border-white/[0.08] bg-white/[0.03] text-zinc-300 hover:bg-white/[0.06] font-medium text-sm transition-colors disabled:opacity-60"
+                  className="w-full py-4 rounded-full bg-foreground text-background font-semibold text-sm hover:bg-zinc-200 transition-colors disabled:opacity-60"
                 >
-                  {submitting ? "Unlocking..." : "Unlock without account"}
+                  {submitting ? "Unlocking..." : "Unlock Full Analysis"}
                 </button>
               </form>
-              <p className="text-xs text-zinc-600 mt-3">No spam. Unsubscribe anytime.</p>
+
+              <p className="text-xs text-zinc-600 mt-4">We respect your inbox. No spam.</p>
+              <p className="text-xs text-zinc-700 mt-2">
+                Already have an account?{" "}
+                <button type="button" onClick={() => setShowAuthModal(true)} className="text-zinc-500 hover:text-zinc-300 transition-colors underline">
+                  Sign in
+                </button>
+              </p>
             </div>
           </div>
         )}
