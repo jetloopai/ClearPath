@@ -170,7 +170,7 @@ const BASE_CSS = `
 
 // ── DEAL SHEET (compact, section-toggleable) ──────────────────────────────────
 function buildDealSheet(body: Record<string, unknown>): string {
-  const { address, price, condition, results, breakdown, customRehab, arvMethod, compsCount, brrrr, sections } = body as {
+  const { address, price, condition, results, breakdown, customRehab, arvMethod, compsCount, brrrr, str, compsUsed, alternatives, sections } = body as {
     address: string
     price: number
     condition: string
@@ -180,10 +180,13 @@ function buildDealSheet(body: Record<string, unknown>): string {
     arvMethod: string
     compsCount: number
     brrrr: Record<string, number & string>
-    sections: { flip: boolean; buyhold: boolean; brrrr: boolean; mao: boolean }
+    str: Record<string, number & string> | undefined
+    compsUsed: Array<Record<string, unknown>> | undefined
+    alternatives: Array<Record<string, unknown>> | undefined
+    sections: { flip: boolean; buyhold: boolean; brrrr: boolean; mao: boolean; comps: boolean; scenarios: boolean; cashRequired: boolean; str: boolean }
   }
 
-  const sec = sections ?? { flip: true, buyhold: true, brrrr: true, mao: true }
+  const sec = sections ?? { flip: true, buyhold: true, brrrr: true, mao: true, comps: true, scenarios: true, cashRequired: true, str: true }
   const rehab = customRehab ?? results.rehabEstimate
   const flipProfit = Math.round(results.arv - price - rehab - (breakdown?.sellingCosts ?? results.arv * 0.08) - (breakdown?.holdingCosts ?? price * 0.06))
   const mao = Math.round(results.arv * 0.7 - rehab)
@@ -272,6 +275,80 @@ ${sec.brrrr && brrrr ? `
   <tr><td>DSCR</td><td class="${brrrr.dscr >= 1.25 ? 'green' : brrrr.dscr >= 1.0 ? 'amber' : 'red'}">${Number(brrrr.dscr).toFixed(2)} ${brrrr.dscr >= 1.25 ? '✓ Lender Ready' : brrrr.dscr >= 1.0 ? '⚠ Borderline' : '✗ Negative Coverage'}</td></tr>
   <tr class="highlight-row"><td><strong>${brrrr.cashLeftInDeal <= 0 ? '✓ Full BRRRR — All cash recycled' : `${Math.round((1 - brrrr.cashLeftInDeal / brrrr.allInCost) * 100)}% of capital recovered`}</strong></td><td class="${brrrrSig === 'green' ? 'green' : brrrrSig === 'yellow' ? 'amber' : 'red'}"><strong>${brrrrSig === 'green' ? 'Perfect BRRRR' : brrrrSig === 'yellow' ? 'Strong BRRRR' : 'Partial BRRRR'}</strong></td></tr>
 </table>` : ''}
+
+${sec.cashRequired ? `
+<h2>Total Cash Required</h2>
+<table class="no-break">
+  <tr><td>Down Payment</td><td>${fmt(breakdown?.downPayment ?? 0)}</td></tr>
+  <tr><td>Closing Costs</td><td>${fmt(breakdown?.closingCostsBuy ?? 0)}</td></tr>
+  <tr><td>Rehab</td><td>${fmt(rehab)}</td></tr>
+  <tr class="highlight-row"><td><strong>Total Cash-In</strong></td><td><strong>${fmt((breakdown?.downPayment ?? 0) + (breakdown?.closingCostsBuy ?? 0) + rehab)}</strong></td></tr>
+</table>` : ''}
+
+${sec.comps && compsUsed && compsUsed.length > 0 ? `
+<h2>Comparable Sales (ARV Basis)</h2>
+<table>
+  <tr><th>Distance</th><th>Price</th><th>SqFt</th><th>Beds</th><th>$/SqFt</th></tr>
+  ${compsUsed.map((c: Record<string, unknown>) => {
+    const ppsf = (c.living_area_sqft as number) > 0 ? Math.round((c.price as number) / (c.living_area_sqft as number)) : 0
+    return `<tr>
+      <td>${((c.distanceMiles as number) ?? 0).toFixed(2)} mi</td>
+      <td>${fmt(c.price as number)}</td>
+      <td>${(c.living_area_sqft as number).toLocaleString()}</td>
+      <td>${c.bedrooms}</td>
+      <td>$${ppsf}</td>
+    </tr>`
+  }).join('')}
+</table>
+<div class="note">ARV = subject sqft × median $/sqft × ${condLabel} condition uplift</div>` : ''}
+
+${sec.scenarios && alternatives && alternatives.length > 0 ? `
+<h2>Scenario Analysis — All Conditions</h2>
+<table>
+  <tr><th>Condition</th><th>ARV</th><th>Rehab</th><th>Flip Profit</th><th>Cash Flow</th><th>Signals</th></tr>
+  ${alternatives.map((a: Record<string, unknown>) => {
+    const selected = a.condition === condition
+    return `<tr${selected ? ' class="highlight-row"' : ''}>
+      <td>${String(a.condition).charAt(0).toUpperCase() + String(a.condition).slice(1)}${selected ? ' ★' : ''}</td>
+      <td>${fmt(a.arv as number)}</td>
+      <td>${fmt(a.rehabMidpoint as number)}</td>
+      <td class="${(a.flipSignal as string) === 'green' ? 'green' : (a.flipSignal as string) === 'red' ? 'red' : 'amber'}">${(a.flipProfit as number) >= 0 ? '+' : ''}${fmt(a.flipProfit as number)}</td>
+      <td class="${(a.rentalSignal as string) === 'green' ? 'green' : (a.rentalSignal as string) === 'red' ? 'red' : 'amber'}">${(a.monthlyCashFlow as number) >= 0 ? '+' : ''}${fmt(a.monthlyCashFlow as number)}/mo</td>
+      <td>${signal(a.flipSignal as string, '')} ${signal(a.rentalSignal as string, '')}</td>
+    </tr>`
+  }).join('')}
+</table>` : ''}
+
+${sec.str && str ? (() => {
+  const strSig = str.cashFlowSignal as string ?? 'red'
+  const strColor = strSig === 'green' ? '#059669' : strSig === 'yellow' ? '#d97706' : '#dc2626'
+  const vsLtrAmt = str.vsLtr as number ?? 0
+  return `
+<h2>Short-Term Rental (Airbnb / STR)</h2>
+<div class="two-col no-break">
+  <div>
+    <table>
+      <tr><td>Nightly Rate</td><td>${fmt(str.nightlyRate as number)}/night</td></tr>
+      <tr><td>Occupancy</td><td>${Math.round((str.occupancy as number) * 100)}%</td></tr>
+      <tr><td>Avg Stay</td><td>${str.avgStay} nights</td></tr>
+      <tr><td>Gross Monthly</td><td>${fmt(str.grossMonthly as number)}</td></tr>
+      <tr><td>Platform Fee (3%)</td><td>− ${fmt(str.platformFee as number)}</td></tr>
+      <tr><td>Cleaning (${str.turnovers}× $100)</td><td>− ${fmt(str.cleaningCost as number)}</td></tr>
+      <tr class="highlight-row"><td><strong>Net STR Income</strong></td><td><strong>${fmt(str.netIncome as number)}/mo</strong></td></tr>
+    </table>
+  </div>
+  <div>
+    <table>
+      <tr><td>Mortgage</td><td>− ${fmt(breakdown?.mortgage ?? 0)}/mo</td></tr>
+      <tr><td>Insurance</td><td>− ${fmt(breakdown?.insurance ?? 0)}/mo</td></tr>
+      <tr><td>Property Taxes</td><td>− ${fmt(breakdown?.taxes ?? 0)}/mo</td></tr>
+      <tr class="highlight-row"><td><strong>STR Cash Flow</strong></td><td style="color:${strColor}"><strong>${(str.cashFlow as number) >= 0 ? '+' : ''}${fmt(str.cashFlow as number)}/mo</strong></td></tr>
+      <tr><td>vs. Long-Term Rental</td><td class="${vsLtrAmt >= 0 ? 'green' : 'red'}">${vsLtrAmt >= 0 ? '+' : ''}${fmt(vsLtrAmt)}/mo</td></tr>
+      <tr><td>Annual Net Income</td><td>${fmt(str.annualNet as number)}</td></tr>
+    </table>
+  </div>
+</div>`
+})() : ''}
 
 <div class="footer">
   <span>Generated by ClearPath Analyzer &nbsp;·&nbsp; clearpathassetgroup.com</span>

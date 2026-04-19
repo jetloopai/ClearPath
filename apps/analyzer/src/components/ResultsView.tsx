@@ -214,6 +214,10 @@ export default function ResultsView() {
     buyhold: true,
     brrrr: true,
     mao: true,
+    comps: true,
+    scenarios: true,
+    cashRequired: true,
+    str: true,
   });
   const toggleSection = (key: keyof typeof dealSheetSections) =>
     setDealSheetSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -503,6 +507,22 @@ export default function ResultsView() {
       dscr,
       brrrrSignal,
       effectiveRefiRate,
+    },
+    // STR values for report
+    str: {
+      nightlyRate: effectiveNightlyRate,
+      occupancy: strOccPct,
+      avgStay: strStay,
+      grossMonthly: strGrossMonthly,
+      platformFee: strPlatformFee,
+      turnovers: strTurnovers,
+      cleaningCost: strCleaningCost,
+      netIncome: strNetIncome,
+      expenses: strExpenses,
+      cashFlow: strCashFlow,
+      cashFlowSignal: strCashFlowSignal,
+      vsLtr: strVsLtr,
+      annualNet: strAnnualNet,
     },
     // Deal sheet section toggles (ignored for full report)
     sections: dealSheetSections,
@@ -2382,10 +2402,14 @@ export default function ResultsView() {
                 {/* Section toggles */}
                 <div className="mb-3 space-y-1.5">
                   {([
-                    { key: "flip",    label: "Flip Analysis" },
-                    { key: "buyhold", label: "Buy & Hold" },
-                    { key: "brrrr",   label: "BRRRR Analysis" },
-                    { key: "mao",     label: "MAO / Key Numbers" },
+                    { key: "flip",         label: "Flip Analysis" },
+                    { key: "buyhold",      label: "Buy & Hold" },
+                    { key: "brrrr",        label: "BRRRR Analysis" },
+                    { key: "mao",          label: "MAO / Key Numbers" },
+                    { key: "comps",        label: "Comparable Sales" },
+                    { key: "scenarios",    label: "Scenario Analysis" },
+                    { key: "cashRequired", label: "Cash Required" },
+                    { key: "str",          label: "Short-Term Rental" },
                   ] as const).map(({ key, label }) => (
                     <button
                       key={key}
