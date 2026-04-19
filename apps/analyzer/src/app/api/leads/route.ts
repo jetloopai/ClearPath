@@ -46,6 +46,8 @@ export async function POST(req: NextRequest) {
         source: 'analyzer',
         status: 'new',
         email_sequence: serviceArea ? 'cook_county_flow' : 'national_nurture',
+        next_email_at: new Date(Date.now() + (serviceArea ? 1 : 2) * 86400000).toISOString(),
+        sequence_step: 2,
         tags,
         qualification_score,
       },

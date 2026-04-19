@@ -96,6 +96,8 @@ export async function POST(req: NextRequest) {
         is_service_area: true,
         status: 'new',
         email_sequence: 'asset_group_inquiry',
+        next_email_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+        sequence_step: 2,
         tags,
         qualification_score,
       },

@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
       source: 'content',
       status: 'nurture',
       email_sequence: 'national_nurture',
+      next_email_at: new Date(Date.now() + 2 * 86400000).toISOString(),
+      sequence_step: 2,
       tags: ['source:content', 'newsletter_subscriber'],
     })
     if (error) {
