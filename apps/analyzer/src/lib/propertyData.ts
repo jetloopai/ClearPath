@@ -539,8 +539,8 @@ export function toLegacyPropertyData(canonical: CanonicalPropertyData): Property
     lat: subject.lat,
     lng: subject.lng,
     comps: canonical.saleComparables.map(normalizeComp),
-    nearbyRents: canonical.rentalListings.map(listing => listing.price),
-    nearbyRentListings: canonical.rentalListings.filter(listing => Boolean(listing.url)).map(listing => ({
+    nearbyRents: filterRentalsByDistance(canonical.rentalListings, subject.lat, subject.lng).map(listing => listing.price),
+    nearbyRentListings: filterRentalsByDistance(canonical.rentalListings, subject.lat, subject.lng).filter(listing => Boolean(listing.url)).map(listing => ({
       price: listing.price,
       url: listing.url!,
       address: listing.address,
@@ -564,6 +564,19 @@ export function toLegacyPropertyData(canonical: CanonicalPropertyData): Property
 export async function fetchPropertyData(address: string): Promise<PropertyData> {
   const canonical = await getCanonicalPropertyData(address)
   return toLegacyPropertyData(canonical)
+}
+
+function filterRentalsByDistance(
+  listings: CanonicalRentalListing[],
+  subjectLat: number | null,
+  subjectLng: number | null,
+): CanonicalRentalListing[] {
+  if (!subjectLat || !subjectLng) return listings
+  const MAX_KM = 1.5 * 1.60934
+  const filtered = listings.filter(l =>
+    !l.latitude || !l.longitude || haversineKm(subjectLat, subjectLng, l.latitude, l.longitude) <= MAX_KM
+  )
+  return filtered.length >= 2 ? filtered : listings
 }
 
 export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {

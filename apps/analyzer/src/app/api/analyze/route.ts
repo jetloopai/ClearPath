@@ -553,7 +553,7 @@ export async function POST(req: NextRequest) {
     const altProviderAvm = property.valueEstimate ? Math.round(property.valueEstimate * compsUplift[cond]) : null
     const altArv = altCompsDetails?.arv ?? altProviderAvm ?? Math.round(numericPrice * arvMultipliers[cond])
     const [altLowRate, altHighRate] = rehabRanges[cond]
-    let altRehabBase = Math.round((effectiveSqft * altLowRate + effectiveSqft * altHighRate) / 2)
+    let altRehabBase = Math.round((effectiveSqft * altLowRate + effectiveSqft * altHighRate) / 2 * metroMult)
     if (property.yearBuilt < 1970) altRehabBase = Math.round(altRehabBase * 1.15)
     else if (property.yearBuilt < 1990) altRehabBase = Math.round(altRehabBase * 1.07)
     const altRehab = Math.round(altRehabBase * (1 + (units - 1) * 0.65))
@@ -623,6 +623,8 @@ export async function POST(req: NextRequest) {
       rentSource,
       rentProvider,
       rentExplainer,
+      subjectLat: property.lat ?? null,
+      subjectLng: property.lng ?? null,
       providerTrace: property.providerTrace,
       providerWarnings: property.providerWarnings,
       dataWarnings,
@@ -677,7 +679,7 @@ export async function POST(req: NextRequest) {
     arvRange,
     arvExplainer,
     arvProvider,
-    compsCount: compsUsed.length,
+    compsCount: compsDetails?.filteredComps.length ?? compsUsed.length,
     rentSource,
     rentExplainer,
     rentProvider,

@@ -1546,7 +1546,7 @@ export default function ResultsView() {
                 {[
                   { label: "Gross Rent", value: fmt(results.rentEstimate) + "/mo" },
                   { label: "Per Unit", value: fmt(results.rentPerUnit) + "/unit" },
-                  { label: "Cap Rate", value: `${Math.round(((results.rentEstimate - monthlyExpenses) * 12 / results.arv) * 1000) / 10}%` },
+                  { label: "Cap Rate", value: `${Math.round(((results.rentEstimate - monthlyExpenses) * 12 / price) * 1000) / 10}%` },
                   { label: "GRM", value: `${Math.round(results.arv / (results.rentEstimate * 12) * 10) / 10}x` },
                 ].map(s => (
                   <div key={s.label} className="glass-panel rounded-xl p-3 text-center border border-white/[0.04]">
