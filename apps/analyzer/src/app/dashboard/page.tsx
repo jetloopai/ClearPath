@@ -499,6 +499,8 @@ export default function DashboardPage() {
       rentExplainer: deal.inputs?.provenance?.rentExplainer,
       dataWarnings: deal.inputs?.provenance?.dataWarnings ?? [],
       subjectData:  deal.inputs?.provenance?.subjectData,
+      subjectLat:   deal.inputs?.provenance?.subjectLat ?? null,
+      subjectLng:   deal.inputs?.provenance?.subjectLng ?? null,
       fromDashboard: true,
     }));
     router.push("/results");

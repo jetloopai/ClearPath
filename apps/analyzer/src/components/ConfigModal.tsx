@@ -239,8 +239,7 @@ export function ConfigModal({ address, county, onClose }: ConfigModalProps) {
         imageAnalysis: imageAnalysis ?? undefined,
       }));
 
-      router.push("/results");
-      onClose();
+      window.location.href = "/results";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
       setLoading(false);
