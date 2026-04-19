@@ -497,10 +497,7 @@ export async function getCanonicalPropertyData(address: string, policy: Provider
       },
     },
     providerTrace: trace,
-    providerWarnings: [
-      ...buildProviderWarnings(trace),
-      ...(rapidApiFallbackReason ? [`[RapidAPI fallback] ${rapidApiFallbackReason}`] : []),
-    ],
+    providerWarnings: buildProviderWarnings(trace),
     isStubData: false,
   }
 }
