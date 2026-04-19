@@ -464,24 +464,64 @@ export async function POST(req: NextRequest) {
   if (!address) return NextResponse.json({ error: 'address required' }, { status: 400 })
 
   const innerHtml = reportType === 'full_report' ? buildFullReport(body) : buildDealSheet(body)
-
   const title = `${reportType === 'full_report' ? 'ClearPath Full Report' : 'ClearPath Deal Sheet'} — ${address}`
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body>${innerHtml}${
-    mode === 'print' ? `<style>
-  #print-tip { background:#1a1a2e; color:#94a3b8; font-family:Arial,sans-serif; font-size:11px; padding:10px 16px; text-align:center; }
-  #print-tip strong { color:#f1f5f9; }
-  @media print { #print-tip { display:none !important; } }
-</style>
-<div id="print-tip">In the print dialog → <strong>More settings</strong> → uncheck <strong>Headers and footers</strong> for a clean PDF.</div>
-<script>
-window.onload = function() {
-  setTimeout(function() { window.print(); }, 400);
-};
-<\/script>` : ''
-  }</body></html>`
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body>${innerHtml}</body></html>`
 
-  return new NextResponse(html, {
-    status: 200,
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
-  })
+  // Preview mode: return HTML for in-browser view
+  if (mode === 'preview') {
+    return new NextResponse(html, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })
+  }
+
+  // PDF mode: render with headless Chrome → true vector PDF
+  try {
+    let browser
+    const isVercel = process.env.VERCEL === '1' || process.env.AWS_LAMBDA_FUNCTION_NAME
+
+    if (isVercel) {
+      const chromium = (await import('@sparticuz/chromium-min')).default
+      const puppeteer = (await import('puppeteer-core')).default
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath(
+          'https://github.com/Sparticuz/chromium/releases/download/v147.0.0/chromium-v147.0.0-pack.tar'
+        ),
+        headless: true,
+      })
+    } else {
+      const puppeteer = (await import('puppeteer')).default
+      browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+    }
+
+    const page = await browser.newPage()
+    await page.setContent(html, { waitUntil: 'networkidle0' })
+    const pdfBuffer = await page.pdf({
+      format: 'Letter',
+      printBackground: true,
+      margin: { top: '0', right: '0', bottom: '0', left: '0' },
+    })
+    await browser.close()
+
+    const fileSlug = address.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60)
+    const filename = reportType === 'full_report'
+      ? `ClearPath-Full-Report-${fileSlug}.pdf`
+      : `ClearPath-Deal-Sheet-${fileSlug}.pdf`
+
+    return new NextResponse(Buffer.from(pdfBuffer), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+      },
+    })
+  } catch (err) {
+    console.error('PDF generation error:', err)
+    // Fallback: return HTML if Puppeteer fails
+    return new NextResponse(html, {
+      status: 200,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })
+  }
 }

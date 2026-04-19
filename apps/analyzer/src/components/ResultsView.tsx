@@ -534,73 +534,32 @@ export default function ResultsView() {
     if (!analysis || downloading) return;
     setDownloading(reportType);
     try {
-      // 1. Fetch HTML
       const res = await fetch("/api/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...reportPayload(reportType), mode: "preview" }),
+        body: JSON.stringify({ ...reportPayload(reportType), mode: "print" }),
       });
       if (!res.ok) throw new Error("Report failed");
-      const html = await res.text();
 
-      // Letter page dimensions in px at 96dpi
-      const PAGE_W = 816;
-      const PAGE_H = 1056;
-
-      // 2. Render in a hidden iframe — tall enough to hold full content
-      const iframe = document.createElement("iframe");
-      iframe.style.cssText = `position:fixed;top:-9999px;left:-9999px;width:${PAGE_W}px;height:${PAGE_H * 3}px;border:none;visibility:hidden;`;
-      document.body.appendChild(iframe);
-      iframe.contentDocument!.open();
-      iframe.contentDocument!.write(html);
-      iframe.contentDocument!.close();
-
-      // 3. Wait for layout + fonts
-      await new Promise(r => setTimeout(r, 1000));
-
-      // Measure real content height
-      const contentH = iframe.contentDocument!.body.scrollHeight;
-      iframe.style.height = `${contentH}px`;
-      await new Promise(r => setTimeout(r, 200));
-
-      // 4. Capture full content at 2× for sharpness
-      const { default: html2canvas } = await import("html2canvas");
-      const canvas = await html2canvas(iframe.contentDocument!.body, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        width: PAGE_W,
-        height: contentH,
-        windowWidth: PAGE_W,
-        windowHeight: contentH,
-      });
-
-      // 5. Slice canvas into letter-page chunks and build multi-page PDF
-      const { jsPDF } = await import("jspdf");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: [PAGE_W, PAGE_H] });
-
-      const totalPages = Math.ceil(contentH / PAGE_H);
-      for (let page = 0; page < totalPages; page++) {
-        if (page > 0) pdf.addPage();
-        // Crop the canvas for this page
-        const srcY = page * PAGE_H * 2;          // ×2 for scale
-        const srcH = Math.min(PAGE_H * 2, canvas.height - srcY);
-        const pageCanvas = document.createElement("canvas");
-        pageCanvas.width = PAGE_W * 2;
-        pageCanvas.height = PAGE_H * 2;
-        const ctx = pageCanvas.getContext("2d")!;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        ctx.drawImage(canvas, 0, srcY, PAGE_W * 2, srcH, 0, 0, PAGE_W * 2, srcH);
-        const imgData = pageCanvas.toDataURL("image/jpeg", 0.95);
-        pdf.addImage(imgData, "JPEG", 0, 0, PAGE_W, PAGE_H);
+      const contentType = res.headers.get("content-type") ?? "";
+      if (contentType.includes("application/pdf")) {
+        // Server returned a real PDF — download it directly
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const slug = analysis.address.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
+        a.href = url;
+        a.download = `${reportType === "full_report" ? "ClearPath-Full-Report" : "ClearPath-Deal-Sheet"}-${slug}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        // Fallback: open HTML in new tab (Puppeteer unavailable)
+        const html = await res.text();
+        const blob = new Blob([html], { type: "text/html" });
+        window.open(URL.createObjectURL(blob), "_blank");
       }
-
-      const slug = analysis.address.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
-      const prefix = reportType === "full_report" ? "ClearPath-Full-Report" : "ClearPath-Deal-Sheet";
-      pdf.save(`${prefix}-${slug}.pdf`);
-
-      document.body.removeChild(iframe);
     } catch (err) {
       console.error("PDF generation failed:", err);
     } finally {
