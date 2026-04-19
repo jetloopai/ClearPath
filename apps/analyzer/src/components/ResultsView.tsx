@@ -2125,7 +2125,7 @@ export default function ResultsView() {
                           <td className="py-2.5 pr-4 text-zinc-400 text-xs" title={comp.address || "No address data"}>
                             {comp.address ? (
                               <a
-                                href={comp.url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(comp.address)}`}
+                                href={comp.url || `https://www.zillow.com/homes/${comp.address.replace(/,/g, '').replace(/\s+/g, '-')}_rb/`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="max-w-[180px] truncate block hover:text-indigo-400 transition-colors underline-offset-2 hover:underline"
