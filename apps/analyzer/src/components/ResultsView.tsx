@@ -2355,10 +2355,11 @@ export default function ResultsView() {
           </div>
         </div>
 
-        {/* Gate overlay */}
+        {/* Gate overlay — fixed so it stays in the viewport regardless of content height */}
         {state === "gated" && (
-          <div ref={gateRef} className="absolute inset-0 flex items-center justify-center p-6">
-            <div className="glass-panel rounded-[2rem] p-10 max-w-md w-full text-center">
+          <div ref={gateRef} className="fixed inset-0 z-40 flex items-center justify-center p-6 pt-24">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <div className="relative z-10 glass-panel rounded-[2rem] p-10 max-w-md w-full text-center">
               <Lock className="w-8 h-8 text-indigo-400 mx-auto mb-4" />
               <h3 className="text-xl font-serif text-foreground mb-2">Unlock the Full Deal Breakdown</h3>
               <p className="text-sm text-zinc-400 mb-6">
