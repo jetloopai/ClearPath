@@ -16,25 +16,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Valid email required' }, { status: 400 })
   }
 
-  const { data, error } = await supabaseAdmin
+  // Check if lead already exists
+  const { data: existing } = await supabaseAdmin
     .from('leads')
-    .upsert(
-      {
-        email,
-        address: zip ? `ZIP ${zip}` : undefined,
-        source: 'content',
-        status: 'nurture',
-        email_sequence: 'national_nurture',
-        tags: ['source:content', 'newsletter_subscriber'],
-      },
-      { onConflict: 'email', ignoreDuplicates: true }
-    )
-    .select('id')
+    .select('id, tags, email_sequence')
+    .eq('email', email)
     .single()
 
-  if (error && error.code !== '23505') {
-    console.error('Newsletter subscribe error:', error)
-    return NextResponse.json({ error: 'Failed to subscribe' }, { status: 500 })
+  if (existing) {
+    // Lead exists — just add newsletter_subscriber tag without overwriting their flow
+    const currentTags: string[] = existing.tags ?? []
+    if (!currentTags.includes('newsletter_subscriber')) {
+      await supabaseAdmin
+        .from('leads')
+        .update({ tags: [...currentTags, 'newsletter_subscriber'] })
+        .eq('id', existing.id)
+    }
+  } else {
+    // New lead — insert as newsletter subscriber with national nurture flow
+    const { error } = await supabaseAdmin.from('leads').insert({
+      email,
+      address: zip ? `ZIP ${zip}` : undefined,
+      source: 'content',
+      status: 'nurture',
+      email_sequence: 'national_nurture',
+      tags: ['source:content', 'newsletter_subscriber'],
+    })
+    if (error) {
+      console.error('Newsletter subscribe error:', error)
+      return NextResponse.json({ error: 'Failed to subscribe' }, { status: 500 })
+    }
   }
 
   sendNewsletterWelcome(email).catch(console.error)
