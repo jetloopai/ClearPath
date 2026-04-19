@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
         source: 'asset_group',
         is_service_area: true,
         status: 'new',
-        email_sequence: 'cook_county_flow',
+        email_sequence: 'asset_group_inquiry',
         tags,
         qualification_score,
       },
