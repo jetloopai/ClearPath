@@ -276,77 +276,82 @@ async function insertAnalysisWithCompatibility(payload: Record<string, unknown>)
 
 export async function POST(req: NextRequest) {
   // ── Auth + credit check (before any expensive work) ──────────────────────
+  // No token = guest run: full analysis but not saved to DB, shown behind email gate on results page
   const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) {
-    return NextResponse.json({ error: 'sign_in_required', message: 'Sign in to run an analysis.' }, { status: 401 })
-  }
-  const { data: { user: authUser } } = await supabaseAdmin.auth.getUser(token)
-  if (!authUser) {
-    return NextResponse.json({ error: 'sign_in_required', message: 'Sign in to run an analysis.' }, { status: 401 })
-  }
+  let authUser: Awaited<ReturnType<typeof supabaseAdmin.auth.getUser>>['data']['user'] | null = null
+  const isGuest = !token
 
-  // Block unverified emails
-  if (!authUser.email_confirmed_at) {
-    return NextResponse.json(
-      { error: 'email_not_verified', message: 'Please verify your email before running an analysis. Check your inbox for a confirmation link.' },
-      { status: 403 }
-    )
-  }
-
-  // Block disposable email domains
-  const DISPOSABLE_DOMAINS = new Set([
-    'mailinator.com','guerrillamail.com','tempmail.com','throwaway.email',
-    'yopmail.com','sharklasers.com','spam4.me','trashmail.com','maildrop.cc',
-    'dispostable.com','fakeinbox.com','temp-mail.org','mailnull.com','spamgourmet.com',
-  ])
-  const emailDomain = (authUser.email ?? '').split('@')[1]?.toLowerCase()
-  if (emailDomain && DISPOSABLE_DOMAINS.has(emailDomain)) {
-    return NextResponse.json(
-      { error: 'disposable_email', message: 'Please use a permanent email address to run analyses.' },
-      { status: 403 }
-    )
-  }
-
-  let { data: profile } = await supabaseAdmin
-    .from('user_profiles')
-    .select('plan, credits_remaining')
-    .eq('id', authUser.id)
-    .single()
-
-  // Profile missing (signed up before trigger was active) — create it now
-  if (!profile) {
-    const { data: created } = await supabaseAdmin
-      .from('user_profiles')
-      .upsert({ id: authUser.id, plan: 'free', credits_remaining: 3, credits_monthly: 3 }, { onConflict: 'id' })
-      .select('plan, credits_remaining')
-      .single()
-    profile = created
-  }
-
-  const creditsRemaining = profile?.credits_remaining ?? 0
-  const currentPlan = profile?.plan ?? 'free'
-
-  if (currentPlan !== 'admin' && creditsRemaining <= 0) {
-    return NextResponse.json({
-      error: 'upgrade_required',
-      plan: currentPlan,
-      message: currentPlan === 'free'
-        ? 'You have used all 3 free reports. Upgrade to keep analyzing deals.'
-        : `You have used all your ${currentPlan === 'starter' ? '50' : '300'} reports this month. Upgrade to continue.`,
-    }, { status: 402 })
-  }
-
-  // Atomic decrement BEFORE expensive work — admin plan skips this (unlimited, tracked via analyses table)
-  if (currentPlan !== 'admin') {
-    const { error: decrementError, data: decrementData } = await supabaseAdmin
-      .from('user_profiles')
-      .update({ credits_remaining: creditsRemaining - 1, updated_at: new Date().toISOString() })
-      .eq('id', authUser.id)
-      .gt('credits_remaining', 0)
-      .select('id')
-    if (decrementError || !decrementData?.length) {
-      return NextResponse.json({ error: 'upgrade_required', plan: currentPlan }, { status: 402 })
+  if (token) {
+    const { data: { user } } = await supabaseAdmin.auth.getUser(token)
+    if (!user) {
+      return NextResponse.json({ error: 'sign_in_required', message: 'Sign in to run an analysis.' }, { status: 401 })
     }
+
+    // Block unverified emails
+    if (!user.email_confirmed_at) {
+      return NextResponse.json(
+        { error: 'email_not_verified', message: 'Please verify your email before running an analysis. Check your inbox for a confirmation link.' },
+        { status: 403 }
+      )
+    }
+
+    // Block disposable email domains
+    const DISPOSABLE_DOMAINS = new Set([
+      'mailinator.com','guerrillamail.com','tempmail.com','throwaway.email',
+      'yopmail.com','sharklasers.com','spam4.me','trashmail.com','maildrop.cc',
+      'dispostable.com','fakeinbox.com','temp-mail.org','mailnull.com','spamgourmet.com',
+    ])
+    const emailDomain = (user.email ?? '').split('@')[1]?.toLowerCase()
+    if (emailDomain && DISPOSABLE_DOMAINS.has(emailDomain)) {
+      return NextResponse.json(
+        { error: 'disposable_email', message: 'Please use a permanent email address to run analyses.' },
+        { status: 403 }
+      )
+    }
+
+    let { data: profile } = await supabaseAdmin
+      .from('user_profiles')
+      .select('plan, credits_remaining')
+      .eq('id', user.id)
+      .single()
+
+    // Profile missing (signed up before trigger was active) — create it now
+    if (!profile) {
+      const { data: created } = await supabaseAdmin
+        .from('user_profiles')
+        .upsert({ id: user.id, plan: 'free', credits_remaining: 3, credits_monthly: 3 }, { onConflict: 'id' })
+        .select('plan, credits_remaining')
+        .single()
+      profile = created
+    }
+
+    const creditsRemaining = profile?.credits_remaining ?? 0
+    const currentPlan = profile?.plan ?? 'free'
+
+    if (currentPlan !== 'admin' && creditsRemaining <= 0) {
+      return NextResponse.json({
+        error: 'upgrade_required',
+        plan: currentPlan,
+        message: currentPlan === 'free'
+          ? 'You have used all 3 free reports. Upgrade to keep analyzing deals.'
+          : `You have used all your ${currentPlan === 'starter' ? '50' : '300'} reports this month. Upgrade to continue.`,
+      }, { status: 402 })
+    }
+
+    // Atomic decrement BEFORE expensive work — admin plan skips this (unlimited, tracked via analyses table)
+    if (currentPlan !== 'admin') {
+      const { error: decrementError, data: decrementData } = await supabaseAdmin
+        .from('user_profiles')
+        .update({ credits_remaining: creditsRemaining - 1, updated_at: new Date().toISOString() })
+        .eq('id', user.id)
+        .gt('credits_remaining', 0)
+        .select('id')
+      if (decrementError || !decrementData?.length) {
+        return NextResponse.json({ error: 'upgrade_required', plan: currentPlan }, { status: 402 })
+      }
+    }
+
+    authUser = user
   }
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -572,7 +577,7 @@ export async function POST(req: NextRequest) {
     }
   })
 
-  const userId = authUser.id
+  const userId = authUser?.id ?? null
 
   const dataWarnings = [...property.providerWarnings]
   if (normalizedManualSqft) dataWarnings.push(
@@ -632,44 +637,51 @@ export async function POST(req: NextRequest) {
     rawProviders: property.rawProviders,
   }
 
-  const { data: analysis, error } = await insertAnalysisWithCompatibility({
-    property_id: propertyId,
-    input_address: address,
-    input_condition: condition,
-    input_purchase_price: numericPrice,
-    input_down_pct: downPct,
-    input_hold_months: hold,
-    input_interest_rate: interestRate,
-    inputs: analysisPayload,
-    arv,
-    rehab_low: rehabLow,
-    rehab_high: rehabHigh,
-    rehab_estimate: rehabEstimate,
-    rent_estimate: rentEstimate,
-    monthly_mortgage: mortgage,
-    monthly_cash_flow: monthlyCashFlow,
-    cash_on_cash_return: cashOnCash,
-    flip_profit: flipProfit,
-    mao,
-    results,
-    deal_signal_rental: rentalSignal,
-    deal_signal_flip: flipSignal,
-    deal_signal: signal,
-    is_service_area: isCookCounty,
-    arv_method: arvMethod,
-    rent_method: rentSource,
-    comps_used: compsUsed,
-    provider_trace: property.providerTrace,
-    user_id: userId,
-  })
+  let analysisId: string
+  if (isGuest) {
+    // Guest run: skip DB save, analysis shown behind email gate on results page
+    analysisId = `guest-${Date.now()}`
+  } else {
+    const { data: analysis, error } = await insertAnalysisWithCompatibility({
+      property_id: propertyId,
+      input_address: address,
+      input_condition: condition,
+      input_purchase_price: numericPrice,
+      input_down_pct: downPct,
+      input_hold_months: hold,
+      input_interest_rate: interestRate,
+      inputs: analysisPayload,
+      arv,
+      rehab_low: rehabLow,
+      rehab_high: rehabHigh,
+      rehab_estimate: rehabEstimate,
+      rent_estimate: rentEstimate,
+      monthly_mortgage: mortgage,
+      monthly_cash_flow: monthlyCashFlow,
+      cash_on_cash_return: cashOnCash,
+      flip_profit: flipProfit,
+      mao,
+      results,
+      deal_signal_rental: rentalSignal,
+      deal_signal_flip: flipSignal,
+      deal_signal: signal,
+      is_service_area: isCookCounty,
+      arv_method: arvMethod,
+      rent_method: rentSource,
+      comps_used: compsUsed,
+      provider_trace: property.providerTrace,
+      user_id: userId,
+    })
 
-  if (error) {
-    console.error('Analysis insert error:', error)
-    return NextResponse.json({ error: 'Failed to save analysis' }, { status: 500 })
+    if (error) {
+      console.error('Analysis insert error:', error)
+      return NextResponse.json({ error: 'Failed to save analysis' }, { status: 500 })
+    }
+    analysisId = analysis.id
   }
 
   const response: AnalyzeResponse = {
-    analysisId: analysis.id,
+    analysisId,
     results,
     breakdown,
     compsUsed,
