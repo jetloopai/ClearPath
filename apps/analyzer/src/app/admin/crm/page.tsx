@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase-browser";
-import { X, ChevronDown, Mail, Phone, MapPin, Tag, Activity, Pause, Play, RefreshCw } from "lucide-react";
+import { X, Mail, Phone, MapPin, Tag, Activity, Pause, Play, RefreshCw } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -27,11 +27,12 @@ type Lead = {
   is_service_area: boolean;
   tags: string[];
   notes: string | null;
+  last_contacted_at: string | null;
   created_at: string;
   next_email_at: string | null;
 };
 
-type Activity = {
+type LeadActivity = {
   id: string;
   type: string;
   notes: string | null;
@@ -42,6 +43,9 @@ type Activity = {
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const STATUSES = ["new", "contacted", "qualified", "proposal_sent", "converted", "client", "nurture", "lost"];
+const MANUAL_TAGS = ["hot", "qualified", "do_not_contact", "chicago_prospect"];
+
+const SIGNAL_ORDER: Record<string, number> = { green: 0, yellow: 1, red: 2 };
 
 const STATUS_COLOR: Record<string, string> = {
   new:           "bg-indigo-500/10 border-indigo-500/30 text-indigo-300",
@@ -55,15 +59,15 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const SIGNAL_COLOR: Record<string, string> = {
-  green:  "text-emerald-400",
+  green: "text-emerald-400",
   yellow: "text-amber-400",
-  red:    "text-red-400",
+  red: "text-red-400",
 };
 
 const SEQ_LABEL: Record<string, string> = {
-  cook_county_flow:     "Cook County",
-  national_nurture:     "National",
-  asset_group_inquiry:  "Direct Inquiry",
+  cook_county_flow:    "Cook County",
+  national_nurture:    "National",
+  asset_group_inquiry: "Direct Inquiry",
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -74,8 +78,8 @@ const SOURCE_LABEL: Record<string, string> = {
   manual:      "Manual",
 };
 
-const fmt = (v: number) =>
-  v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`;
+const fmt = (v: number) => v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`;
+const pct = (n: number, d: number) => d === 0 ? "—" : `${Math.round((n / d) * 100)}%`;
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -91,7 +95,7 @@ function timeAgo(iso: string) {
 // ── Lead Detail Drawer ────────────────────────────────────────────────────────
 
 function LeadDrawer({ lead, onClose, onUpdate }: { lead: Lead; onClose: () => void; onUpdate: (l: Lead) => void }) {
-  const [activity, setActivity] = useState<Activity[]>([]);
+  const [activity, setActivity] = useState<LeadActivity[]>([]);
   const [notes, setNotes] = useState(lead.notes ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -111,12 +115,15 @@ function LeadDrawer({ lead, onClose, onUpdate }: { lead: Lead; onClose: () => vo
     setSaving(false);
   };
 
-  const saveNotes = () => updateField({ notes });
-  const togglePause = () => updateField({ sequence_paused: !lead.sequence_paused });
+  const toggleTag = (tag: string) => {
+    const current = lead.tags ?? [];
+    const next = current.includes(tag) ? current.filter(t => t !== tag) : [...current, tag];
+    updateField({ tags: next });
+  };
 
-  const row = (label: string, value: React.ReactNode) => (
+  const row = (label: React.ReactNode, value: React.ReactNode) => (
     <div className="flex justify-between items-start py-2 border-b border-white/[0.04]">
-      <span className="text-xs text-zinc-500 w-32 shrink-0">{label}</span>
+      <span className="text-xs text-zinc-500 w-36 shrink-0">{label}</span>
       <span className="text-xs text-zinc-200 text-right">{value ?? "—"}</span>
     </div>
   );
@@ -130,16 +137,21 @@ function LeadDrawer({ lead, onClose, onUpdate }: { lead: Lead; onClose: () => vo
           <div>
             <p className="text-sm font-medium text-zinc-100">{lead.name ?? lead.email}</p>
             {lead.name && <p className="text-xs text-zinc-500 mt-0.5">{lead.email}</p>}
-            <div className="flex gap-2 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               <span className={`text-[10px] px-2 py-0.5 rounded-full border ${STATUS_COLOR[lead.status] ?? "border-white/10 text-zinc-400"}`}>
                 {lead.status}
               </span>
               {lead.is_service_area && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full border border-indigo-500/30 text-indigo-300 bg-indigo-500/10">Cook County</span>
               )}
+              {lead.tags?.includes("hot") && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full border border-red-500/30 text-red-300 bg-red-500/10">🔴 hot</span>
+              )}
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 transition-colors"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 transition-colors ml-4 shrink-0">
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -155,12 +167,14 @@ function LeadDrawer({ lead, onClose, onUpdate }: { lead: Lead; onClose: () => vo
             </select>
           </div>
 
-          {/* Contact info */}
+          {/* Contact */}
           <div>
             <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Contact</p>
             {row(<><Phone className="w-3 h-3 inline mr-1" />Phone</>, lead.phone)}
             {row(<><MapPin className="w-3 h-3 inline mr-1" />Address</>, lead.address)}
             {row(<><Mail className="w-3 h-3 inline mr-1" />Source</>, SOURCE_LABEL[lead.source] ?? lead.source)}
+            {row("Last Contact", lead.last_contacted_at ? timeAgo(lead.last_contacted_at) : "—")}
+            {row("Added", timeAgo(lead.created_at))}
           </div>
 
           {/* Deal data */}
@@ -183,7 +197,7 @@ function LeadDrawer({ lead, onClose, onUpdate }: { lead: Lead; onClose: () => vo
             {row("Step", lead.sequence_step)}
             {row("Next Email", lead.next_email_at ? timeAgo(lead.next_email_at) : "Complete")}
             <button
-              onClick={togglePause}
+              onClick={() => updateField({ sequence_paused: !lead.sequence_paused })}
               disabled={saving}
               className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 border-white/[0.08] text-zinc-400 hover:text-zinc-200"
             >
@@ -192,16 +206,37 @@ function LeadDrawer({ lead, onClose, onUpdate }: { lead: Lead; onClose: () => vo
           </div>
 
           {/* Tags */}
-          {lead.tags?.length > 0 && (
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2"><Tag className="w-3 h-3 inline mr-1" />Tags</p>
-              <div className="flex flex-wrap gap-1.5">
-                {lead.tags.map(t => (
-                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-zinc-400">{t}</span>
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2"><Tag className="w-3 h-3 inline mr-1" />Tags</p>
+            {/* Auto tags (read-only) */}
+            {lead.tags?.filter(t => !MANUAL_TAGS.includes(t)).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {lead.tags.filter(t => !MANUAL_TAGS.includes(t)).map(t => (
+                  <span key={t} className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.08] text-zinc-500">{t}</span>
                 ))}
               </div>
+            )}
+            {/* Manual tags (toggleable) */}
+            <div className="flex flex-wrap gap-1.5">
+              {MANUAL_TAGS.map(t => {
+                const active = lead.tags?.includes(t);
+                return (
+                  <button
+                    key={t}
+                    onClick={() => toggleTag(t)}
+                    disabled={saving}
+                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors disabled:opacity-50 ${
+                      active
+                        ? "border-indigo-500/40 text-indigo-300 bg-indigo-500/10"
+                        : "border-white/[0.08] text-zinc-600 hover:text-zinc-400 hover:border-white/20"
+                    }`}
+                  >
+                    {active ? `✓ ${t}` : `+ ${t}`}
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
 
           {/* Notes */}
           <div>
@@ -213,7 +248,11 @@ function LeadDrawer({ lead, onClose, onUpdate }: { lead: Lead; onClose: () => vo
               placeholder="Add notes..."
               className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-indigo-500/50 resize-none"
             />
-            <button onClick={saveNotes} disabled={saving || notes === (lead.notes ?? "")} className="mt-1.5 text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-40 transition-colors">
+            <button
+              onClick={() => updateField({ notes })}
+              disabled={saving || notes === (lead.notes ?? "")}
+              className="mt-1.5 text-xs text-indigo-400 hover:text-indigo-300 disabled:opacity-40 transition-colors"
+            >
               {saving ? "Saving…" : "Save Notes"}
             </button>
           </div>
@@ -248,15 +287,15 @@ function LeadDrawer({ lead, onClose, onUpdate }: { lead: Lead; onClose: () => vo
 export default function CRMPage() {
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [analysesCount, setAnalysesCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Lead | null>(null);
   const [filterSource, setFilterSource] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("active");
   const [filterSeq, setFilterSeq] = useState("all");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    // Admin guard
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) { router.push("/"); return; }
       const { data: profile } = await supabase.from("profiles").select("plan").eq("id", session.user.id).single();
@@ -267,12 +306,21 @@ export default function CRMPage() {
 
   const loadLeads = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("leads")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(500);
-    setLeads(data ?? []);
+    const [{ data }, { count }] = await Promise.all([
+      supabase.from("leads").select("*").limit(500),
+      supabase.from("analyses").select("id", { count: "exact", head: true }),
+    ]);
+
+    const sorted = (data ?? []).sort((a: Lead, b: Lead) => {
+      if (b.is_service_area !== a.is_service_area) return b.is_service_area ? 1 : -1;
+      const sa = SIGNAL_ORDER[a.deal_signal ?? ""] ?? 3;
+      const sb = SIGNAL_ORDER[b.deal_signal ?? ""] ?? 3;
+      if (sa !== sb) return sa - sb;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    setLeads(sorted);
+    setAnalysesCount(count ?? 0);
     setLoading(false);
   };
 
@@ -282,8 +330,9 @@ export default function CRMPage() {
   };
 
   const filtered = useMemo(() => leads.filter(l => {
+    if (filterStatus === "active" && (l.status === "lost" || l.status === "nurture")) return false;
+    if (filterStatus !== "all" && filterStatus !== "active" && l.status !== filterStatus) return false;
     if (filterSource !== "all" && l.source !== filterSource) return false;
-    if (filterStatus !== "all" && l.status !== filterStatus) return false;
     if (filterSeq !== "all" && l.email_sequence !== filterSeq) return false;
     if (search) {
       const q = search.toLowerCase();
@@ -292,12 +341,15 @@ export default function CRMPage() {
     return true;
   }), [leads, filterSource, filterStatus, filterSeq, search]);
 
-  const stats = useMemo(() => ({
-    total: leads.length,
-    cookCounty: leads.filter(l => l.is_service_area).length,
-    clients: leads.filter(l => l.status === "client" || l.status === "converted").length,
-    new: leads.filter(l => l.status === "new").length,
-  }), [leads]);
+  const metrics = useMemo(() => {
+    const total = leads.length;
+    const cookCounty = leads.filter(l => l.is_service_area).length;
+    const converted = leads.filter(l => l.status === "client" || l.status === "converted").length;
+    const newLeads = leads.filter(l => l.status === "new").length;
+    const scores = leads.map(l => l.qualification_score).filter((s): s is number => s != null);
+    const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+    return { total, cookCounty, converted, newLeads, avgScore };
+  }, [leads]);
 
   const selectClass = "bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-indigo-500/40";
 
@@ -315,17 +367,33 @@ export default function CRMPage() {
           </button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        {/* Stats row 1 — counts */}
+        <div className="grid grid-cols-4 gap-4 mb-3">
           {[
-            { label: "Total Leads", value: stats.total },
-            { label: "Cook County", value: stats.cookCounty },
-            { label: "New", value: stats.new },
-            { label: "Clients", value: stats.clients },
+            { label: "Total Leads", value: metrics.total },
+            { label: "Cook County", value: metrics.cookCounty },
+            { label: "New", value: metrics.newLeads },
+            { label: "Clients", value: metrics.converted },
           ].map(s => (
             <div key={s.label} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
               <p className="text-xs text-zinc-500 mb-1">{s.label}</p>
               <p className="text-2xl font-serif text-zinc-100">{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Stats row 2 — rates */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          {[
+            { label: "Capture Rate", value: pct(metrics.total, analysesCount), sub: `${metrics.total} of ${analysesCount} analyses` },
+            { label: "Cook County Rate", value: pct(metrics.cookCounty, metrics.total), sub: `${metrics.cookCounty} Cook County` },
+            { label: "Conversion Rate", value: pct(metrics.converted, metrics.cookCounty), sub: "converted / Cook County" },
+            { label: "Avg Qual. Score", value: metrics.avgScore ?? "—", sub: "out of 22" },
+          ].map(s => (
+            <div key={s.label} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-4">
+              <p className="text-xs text-zinc-500 mb-1">{s.label}</p>
+              <p className="text-xl font-medium text-zinc-200">{s.value}</p>
+              <p className="text-[10px] text-zinc-600 mt-0.5">{s.sub}</p>
             </div>
           ))}
         </div>
@@ -344,6 +412,7 @@ export default function CRMPage() {
             {Object.entries(SOURCE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectClass}>
+            <option value="active">Active Only</option>
             <option value="all">All Statuses</option>
             {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
@@ -360,16 +429,16 @@ export default function CRMPage() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-white/[0.06]">
-                  {["Lead", "Source", "Status", "Sequence", "Signal", "Score", "Cook Co.", "Added"].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-[10px] uppercase tracking-widest text-zinc-500 font-normal">{h}</th>
+                  {["Lead", "Source", "Status", "Sequence", "Signal", "Score", "Cook Co.", "Contacted", "Added"].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-[10px] uppercase tracking-widest text-zinc-500 font-normal whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-zinc-600">Loading…</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-zinc-600">Loading…</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={8} className="px-4 py-8 text-center text-zinc-600">No leads found.</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-zinc-600">No leads found.</td></tr>
                 ) : filtered.map(lead => (
                   <tr
                     key={lead.id}
@@ -379,30 +448,31 @@ export default function CRMPage() {
                     <td className="px-4 py-3">
                       <p className="text-zinc-200 font-medium">{lead.name ?? lead.email}</p>
                       {lead.name && <p className="text-zinc-600">{lead.email}</p>}
-                      {lead.address && <p className="text-zinc-600 truncate max-w-[200px]">{lead.address}</p>}
+                      {lead.address && <p className="text-zinc-600 truncate max-w-[180px]">{lead.address}</p>}
                     </td>
-                    <td className="px-4 py-3 text-zinc-400">{SOURCE_LABEL[lead.source] ?? lead.source}</td>
+                    <td className="px-4 py-3 text-zinc-400 whitespace-nowrap">{SOURCE_LABEL[lead.source] ?? lead.source}</td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full border text-[10px] ${STATUS_COLOR[lead.status] ?? "border-white/10 text-zinc-400"}`}>
+                      <span className={`px-2 py-0.5 rounded-full border text-[10px] whitespace-nowrap ${STATUS_COLOR[lead.status] ?? "border-white/10 text-zinc-400"}`}>
                         {lead.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-zinc-400">
+                    <td className="px-4 py-3 text-zinc-400 whitespace-nowrap">
                       {lead.email_sequence ? SEQ_LABEL[lead.email_sequence] ?? lead.email_sequence : "—"}
                       {lead.sequence_paused && <span className="ml-1 text-amber-500">⏸</span>}
                     </td>
-                    <td className="px-4 py-3">
-                      {lead.deal_signal ? (
-                        <span className={`font-medium ${SIGNAL_COLOR[lead.deal_signal] ?? "text-zinc-400"}`}>
-                          {lead.deal_signal}
-                        </span>
-                      ) : "—"}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {lead.deal_signal
+                        ? <span className={`font-medium ${SIGNAL_COLOR[lead.deal_signal] ?? "text-zinc-400"}`}>{lead.deal_signal}</span>
+                        : <span className="text-zinc-700">—</span>}
                     </td>
                     <td className="px-4 py-3 text-zinc-400">{lead.qualification_score ?? "—"}</td>
                     <td className="px-4 py-3">
                       {lead.is_service_area ? <span className="text-indigo-400">✓</span> : <span className="text-zinc-700">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-zinc-500">{timeAgo(lead.created_at)}</td>
+                    <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">
+                      {lead.last_contacted_at ? timeAgo(lead.last_contacted_at) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-500 whitespace-nowrap">{timeAgo(lead.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
