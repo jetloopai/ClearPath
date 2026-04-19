@@ -11,6 +11,15 @@ const signal = (s: string, label: string) => {
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
 
+// Escape HTML special characters to prevent XSS in report templates
+const esc = (s: unknown): string =>
+  String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
 // ── Shared CSS ────────────────────────────────────────────────────────────────
 const BASE_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -191,7 +200,7 @@ function buildDealSheet(body: Record<string, unknown>): string {
   const flipProfit = Math.round(results.arv - price - rehab - (breakdown?.sellingCosts ?? results.arv * 0.08) - (breakdown?.holdingCosts ?? price * 0.06))
   const mao = Math.round(results.arv * 0.7 - rehab)
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  const condLabel = condition.charAt(0).toUpperCase() + condition.slice(1)
+  const condLabel = esc(condition.charAt(0).toUpperCase() + condition.slice(1))
   const arvNote = arvMethod === 'comps_based' ? `Comps-based (${compsCount} nearby sales)` : 'Estimated from purchase price'
 
   const brrrrSig = brrrr?.brrrrSignal as string ?? 'red'
@@ -212,7 +221,7 @@ function buildDealSheet(body: Record<string, unknown>): string {
 
 <div class="header">
   <div class="brand">ClearPath Analyzer &nbsp;·&nbsp; Deal Sheet</div>
-  <h1>${address}</h1>
+  <h1>${esc(address)}</h1>
   <div class="meta">${today} &nbsp;·&nbsp; ${condLabel} Condition &nbsp;·&nbsp; ${arvNote}</div>
 </div>
 
@@ -309,7 +318,7 @@ ${sec.scenarios && alternatives && alternatives.length > 0 ? `
   ${alternatives.map((a: Record<string, unknown>) => {
     const selected = a.condition === condition
     return `<tr${selected ? ' class="highlight-row"' : ''}>
-      <td>${String(a.condition).charAt(0).toUpperCase() + String(a.condition).slice(1)}${selected ? ' ★' : ''}</td>
+      <td>${esc(String(a.condition).charAt(0).toUpperCase() + String(a.condition).slice(1))}${selected ? ' ★' : ''}</td>
       <td>${fmt(a.arv as number)}</td>
       <td>${fmt(a.rehabMidpoint as number)}</td>
       <td class="${(a.flipSignal as string) === 'green' ? 'green' : (a.flipSignal as string) === 'red' ? 'red' : 'amber'}">${(a.flipProfit as number) >= 0 ? '+' : ''}${fmt(a.flipProfit as number)}</td>
@@ -377,7 +386,7 @@ function buildFullReport(body: Record<string, unknown>): string {
   const mao = Math.round(r.arv * 0.7 - rehab)
   const flipROI = Math.round((flipProfit / (price + rehab)) * 1000) / 10
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  const condLabel = condition.charAt(0).toUpperCase() + condition.slice(1)
+  const condLabel = esc(condition.charAt(0).toUpperCase() + condition.slice(1))
   const arvNote = arvMethod === 'comps_based' ? `Comps-based ARV (${compsCount} nearby sales)` : 'Estimated from purchase price'
 
   const flipLabel = flipProfit >= 30000 ? 'Strong Flip' : flipProfit >= 10000 ? 'Marginal Flip' : 'Weak Flip'
@@ -407,7 +416,7 @@ function buildFullReport(body: Record<string, unknown>): string {
   ${alternatives.map((a: Record<string, unknown>) => {
     const selected = a.condition === condition
     return `<tr${selected ? ' class="highlight-row"' : ''}>
-      <td>${String(a.condition).charAt(0).toUpperCase() + String(a.condition).slice(1)}${selected ? ' ★' : ''}</td>
+      <td>${esc(String(a.condition).charAt(0).toUpperCase() + String(a.condition).slice(1))}${selected ? ' ★' : ''}</td>
       <td>${fmt(a.arv as number)}</td>
       <td>${fmt(a.rehabMidpoint as number)}</td>
       <td class="${(a.flipSignal as string) === 'green' ? 'green' : (a.flipSignal as string) === 'red' ? 'red' : 'amber'}">${(a.flipProfit as number) >= 0 ? '+' : ''}${fmt(a.flipProfit as number)}</td>
@@ -421,7 +430,7 @@ function buildFullReport(body: Record<string, unknown>): string {
 
 <div class="header">
   <div class="brand">ClearPath Analyzer &nbsp;·&nbsp; Full Deal Report</div>
-  <h1>${address}</h1>
+  <h1>${esc(address)}</h1>
   <div class="meta">${today} &nbsp;·&nbsp; ${condLabel} Condition &nbsp;·&nbsp; ${arvNote}</div>
 </div>
 
@@ -541,7 +550,7 @@ export async function POST(req: NextRequest) {
   if (!address) return NextResponse.json({ error: 'address required' }, { status: 400 })
 
   const innerHtml = reportType === 'full_report' ? buildFullReport(body) : buildDealSheet(body)
-  const title = `${reportType === 'full_report' ? 'ClearPath Full Report' : 'ClearPath Deal Sheet'} — ${address}`
+  const title = `${reportType === 'full_report' ? 'ClearPath Full Report' : 'ClearPath Deal Sheet'} — ${esc(address)}`
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body>${innerHtml}</body></html>`
 
   // Preview mode: return HTML for in-browser view
@@ -573,7 +582,7 @@ export async function POST(req: NextRequest) {
     }
 
     const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0' })
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 })
     const pdfBuffer = await page.pdf({
       format: 'Letter',
       printBackground: true,
