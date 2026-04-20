@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
   if (serviceArea) sendInternalAlert(leadData).catch(console.error)
 
   // Log email_sent activity
-  supabaseAdmin.from('lead_activity').insert({ lead_id: data.id, type: 'email_sent', notes: 'Template A — analyzer confirmation', created_by: 'system' }).then().catch(console.error)
+  void supabaseAdmin.from('lead_activity').insert({ lead_id: data.id, type: 'email_sent', notes: 'Template A — analyzer confirmation', created_by: 'system' })
 
   return NextResponse.json({ id: data.id })
 }
