@@ -38,7 +38,7 @@ export default function Home() {
 
   return (
     <>
-      <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-6 pt-20">
+      <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-6 pt-32">
         {/* Background orb */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-indigo-950/20 rounded-full blur-[180px]" />
