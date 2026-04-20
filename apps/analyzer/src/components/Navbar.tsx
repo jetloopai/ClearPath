@@ -108,7 +108,7 @@ export function Navbar() {
       <header className="fixed top-0 inset-x-0 z-50 bg-black/40 backdrop-blur-xl border-b border-white/[0.05]">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
-            <Image src="/logo.png" alt="ClearPath Analyzer" width={140} height={40} className="h-9 w-auto" priority/>
+            <Image src="/logo.png" alt="ClearPath Analyzer" width={140} height={40} className="h-9 w-auto" style={{filter: 'hue-rotate(-30deg) saturate(0.85)'}} priority/>
           </Link>
 
           {/* Desktop nav */}
