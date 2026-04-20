@@ -1,6 +1,10 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+let _resend: Resend | null = null
+const resend = { emails: { send: (...args: Parameters<Resend['emails']['send']>) => {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY)
+  return _resend.emails.send(...args)
+} } } as unknown as Resend
 
 const ANALYZER_FROM = 'ClearPath Analyzer <noreply@clearpathanalyzer.com>'
 const ASSET_GROUP_FROM = 'ClearPath Asset Group <hello@clearpathassetgroup.com>'
