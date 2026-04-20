@@ -107,8 +107,9 @@ export function Navbar() {
     <>
       <header className="fixed top-0 inset-x-0 z-50 bg-black/40 backdrop-blur-xl border-b border-white/[0.05]">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity" style={{mixBlendMode: 'screen'}}>
-            <Image src="/logo.png" alt="ClearPath Analyzer" width={140} height={40} className="h-9 w-auto" style={{filter: 'hue-rotate(-30deg) contrast(2.2) saturate(0.9)'}} priority/>
+          <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="ClearPath Analyzer" className="h-9 w-auto" style={{filter: 'hue-rotate(-30deg) saturate(0.9)', mixBlendMode: 'screen'}}/>
           </Link>
 
           {/* Desktop nav */}
