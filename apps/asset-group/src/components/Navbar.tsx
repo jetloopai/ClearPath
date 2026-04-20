@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -21,8 +22,8 @@ export function Navbar() {
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-        <Link href="/" className="font-serif text-xl font-semibold tracking-wide text-foreground">
-          ClearPath<span className="text-indigo-400">.</span> Asset Group
+        <Link href="/" className="flex items-center hover:opacity-80 transition-opacity">
+          <Image src="/logo.png" alt="ClearPath Asset Group" width={160} height={44} className="h-10 w-auto" priority/>
         </Link>
         <div className="flex items-center gap-8">
           <Link href="#system" className="text-sm text-zinc-400 hover:text-white transition-colors hidden md:block">
