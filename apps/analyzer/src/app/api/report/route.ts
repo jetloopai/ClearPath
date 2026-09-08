@@ -760,6 +760,7 @@ function buildOfferLetter(body: Record<string, unknown>): string {
   const {
     address, results, customRehab,
     buyerName, offerPrice, earnestMoney, closingDays, expirationDays, inspectionDays,
+    signatureDataUrl, signerName, signedAt, createdAt,
   } = body as {
     address: string
     results: Record<string, number & string>
@@ -770,6 +771,10 @@ function buildOfferLetter(body: Record<string, unknown>): string {
     closingDays: number
     expirationDays: number
     inspectionDays: number
+    signatureDataUrl?: string
+    signerName?: string
+    signedAt?: string
+    createdAt?: string
   }
 
   const rehab = customRehab ?? results.rehabEstimate
@@ -781,7 +786,10 @@ function buildOfferLetter(body: Record<string, unknown>): string {
   const expiration = expirationDays && expirationDays > 0 ? Math.round(expirationDays) : 3
   const buyer = (buyerName ?? '').trim() || 'Buyer'
 
-  const today = new Date()
+  // Anchor closing/expiration dates to when the offer was actually created, not
+  // "now" — otherwise re-downloading a signed offer weeks later would compute a
+  // fabricated, shifted expiration/closing date.
+  const today = createdAt ? new Date(createdAt) : new Date()
   const todayLabel = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   const expiresDate = new Date(today.getTime() + expiration * 24 * 60 * 60 * 1000)
   const expiresLabel = expiresDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -789,9 +797,9 @@ function buildOfferLetter(body: Record<string, unknown>): string {
   const closingLabel = closingDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
   return `<style>${BASE_CSS}
-    .letter-body { padding-top: 4px; }
-    .letter-body > p { margin-bottom: 14px; background: #ffffff; border: 1px solid #e7e9f5; border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 2px rgba(30,27,75,0.04), 0 4px 14px rgba(30,27,75,0.05); }
-    .letter-dateline { font-size: 10.5px; font-weight: 600; color: #8b8fa3; text-align: right; margin-bottom: 16px; }
+    .letter-body { padding-top: 4px; font-size: 12.5px; color: #374151; }
+    .letter-body > p { margin-bottom: 15px; }
+    .letter-dateline { font-size: 10.5px; font-weight: 600; color: #8b8fa3; text-align: right; margin-bottom: 20px; }
     .letter-re {
       font-size: 11px; font-weight: 600; margin-bottom: 18px; padding: 13px 18px;
       background: #eef0fe; border-radius: 12px; color: #312e81;
@@ -811,7 +819,10 @@ function buildOfferLetter(body: Record<string, unknown>): string {
       background: #ffffff; border: 1.5px dashed #c7cbe8; border-radius: 12px;
       padding: 14px 16px 16px;
     }
+    .sign-box.signed { border: 1.5px solid #a7f3d0; background: #f0fdf9; }
     .sign-box .sign-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca0b3; margin-bottom: 22px; }
+    .sign-box.signed .sign-label { color: #059669; margin-bottom: 4px; }
+    .sign-img { display: block; height: 46px; max-width: 100%; object-fit: contain; object-position: left center; margin-bottom: 8px; }
     .sign-line { border-top:1px solid #cbd0e0; padding-top:7px; font-size:9px; color:#6b7280; }
     .sign-line .who { display: block; font-weight: 700; color: #1e2333; font-size: 10px; margin-bottom: 1px; }
   </style>
@@ -854,9 +865,10 @@ ${buildLetterhead('Purchase Offer / Letter of Intent', address, [
     <div class="sign-label">Buyer signature</div>
     <div class="sign-line"><span class="who">${esc(buyer)}</span>Buyer &nbsp;&nbsp;·&nbsp;&nbsp; Date</div>
   </div>
-  <div class="sign-box">
-    <div class="sign-label">Seller signature</div>
-    <div class="sign-line"><span class="who">&nbsp;</span>Seller / Owner of Record &nbsp;&nbsp;·&nbsp;&nbsp; Date</div>
+  <div class="sign-box${signatureDataUrl ? ' signed' : ''}">
+    <div class="sign-label">Seller signature${signatureDataUrl ? ' · Signed electronically' : ''}</div>
+    ${signatureDataUrl ? `<img class="sign-img" src="${esc(signatureDataUrl)}" alt="Seller signature" />` : ''}
+    <div class="sign-line"><span class="who">${signerName ? esc(signerName) : '&nbsp;'}</span>Seller / Owner of Record &nbsp;&nbsp;·&nbsp;&nbsp; ${signedAt ? esc(new Date(signedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })) : 'Date'}</div>
   </div>
 </div>
 </div>

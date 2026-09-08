@@ -423,3 +423,51 @@ export async function sendNewsletterWelcome(email: string) {
     `,
   })
 }
+
+// ── Template E: Offer signature request (sent to the seller) ─────────────────
+export async function sendSignatureRequestEmail(
+  sellerEmail: string,
+  signingUrl: string,
+  address: string,
+  offerPrice: number
+) {
+  if (!process.env.RESEND_API_KEY) return
+
+  await resend.emails.send({
+    from: ANALYZER_FROM,
+    to: sellerEmail,
+    subject: `Purchase offer for ${address}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;background:#050505;color:#e2e8f0;max-width:560px;margin:0 auto;padding:32px">
+        <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#6366f1;margin-bottom:8px">ClearPath Analyzer</p>
+        <h1 style="font-size:22px;font-weight:700;color:#f1f5f9;margin:0 0 4px">You've received a purchase offer</h1>
+        <p style="font-size:13px;color:#64748b;margin:0 0 24px">${address}</p>
+
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding:20px;background:#0f172a;border:1px solid #1e293b;border-radius:12px;text-align:center">
+              <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#64748b;margin:0 0 6px">Offer Price</p>
+              <p style="font-size:28px;font-weight:700;color:#f1f5f9;margin:0">${fmt(offerPrice)}</p>
+            </td>
+          </tr>
+        </table>
+
+        <p style="font-size:14px;color:#cbd5e1;line-height:1.7;margin:20px 0">
+          Review the full terms and sign electronically to accept.
+        </p>
+
+        <table cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="border-radius:10px;background:#6366f1">
+              <a href="${signingUrl}" style="display:inline-block;padding:12px 24px;color:white;text-decoration:none;font-size:13px;font-weight:600">Review &amp; Sign Offer →</a>
+            </td>
+          </tr>
+        </table>
+
+        <p style="font-size:11px;color:#475569;margin:28px 0 0;text-align:center">
+          ClearPath Analyzer · <a href="https://clearpathanalyzer.com" style="color:#6366f1">clearpathanalyzer.com</a>
+        </p>
+      </div>
+    `,
+  })
+}
