@@ -9,15 +9,45 @@ const signal = (s: string, label: string) => {
   return `<span class="badge ${cls}">${esc(label)}</span>`
 }
 
-// Compact colored dot for dense table cells (e.g. a "Signals" column with two indicators) —
-// a full text badge is too wide there.
-const dot = (s: string) => {
-  const color = s === 'green' ? '#10b981' : s === 'yellow' ? '#f59e0b' : '#ef4444'
-  return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};"></span>`
-}
-
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)
+
+// Editorial headline + body for the narrative block — a plain-text "diagnosis"
+// moment instead of another data table, mirroring the deal-signal narrative logic
+// already used client-side in ResultsView.
+function buildNarrative(
+  condLabel: string, price: number, flipProfit: number, cashFlow: number, mao: number,
+  flipSignal: string, rentalSignal: string
+): { headline: string; body: string } {
+  if (flipSignal === 'green' && rentalSignal === 'green') {
+    return {
+      headline: 'Works both ways.',
+      body: `This ${condLabel}-condition property pencils as a flip and a hold. At ${fmt(price)}, that's ${fmt(flipProfit)} gross flip profit or ${fmt(cashFlow)}/mo if you keep it. Dual-exit flexibility is rare — max offer to protect both is ${fmt(mao)}.`,
+    }
+  }
+  if (flipSignal === 'green') {
+    return {
+      headline: 'Strong flip, thin rental.',
+      body: `At ${fmt(price)}, this projects ${fmt(flipProfit)} in gross flip profit. Rental cash flow is tighter at ${fmt(cashFlow)}/mo, so the flip is the play here. Max offer: ${fmt(mao)}.`,
+    }
+  }
+  if (rentalSignal === 'green') {
+    return {
+      headline: 'Built for buy-and-hold.',
+      body: `At ${fmt(price)} this clears ${fmt(cashFlow)}/mo after all expenses. Flip margin is thin at ${fmt(flipProfit)}, so plan to hold. Max offer: ${fmt(mao)}.`,
+    }
+  }
+  if (flipSignal === 'red' && rentalSignal === 'red') {
+    return {
+      headline: 'Tight on both exits.',
+      body: `At ${fmt(price)}, flip profit is ${fmt(flipProfit)} and cash flow is ${fmt(cashFlow)}/mo. You'd need to negotiate down to ${fmt(mao)} to make either exit work.`,
+    }
+  }
+  return {
+    headline: 'Marginal on both exits.',
+    body: `At ${fmt(price)}, this ${condLabel}-condition deal has thin returns either way — ${fmt(flipProfit)} flip profit, ${fmt(cashFlow)}/mo cash flow. Moving the price to ${fmt(mao)} improves the math materially.`,
+  }
+}
 
 // Escape HTML special characters to prevent XSS in report templates
 const esc = (s: unknown): string =>
@@ -54,11 +84,15 @@ const BASE_CSS = `
     font-size: 12px;
     line-height: 1.6;
     color: #1e2333;
-    background: #f4f5fb;
+    background: #faf7f0;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     font-feature-settings: 'tnum' 1, 'cv11' 1;
   }
+
+  /* Display face for headlines/narrative only — data tables stay on Inter for
+     proper tabular numerals. */
+  .display { font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; }
 
   /* ── Page-break rules ── */
   h2        { page-break-after: avoid; }
@@ -69,11 +103,13 @@ const BASE_CSS = `
   /* Prevent blank trailing page */
   body > *:last-child { margin-bottom: 0 !important; page-break-after: avoid; }
 
-  /* ── Cover hero: dark, oversized type, decorative shapes, labeled meta strip ── */
+  /* ── Cover hero: dark, oversized type, decorative shapes, labeled meta strip ──
+     Ink + accent are ClearPath's own tokens (brand-950 / brand-600 / signal-green),
+     not the reference's navy+lime. */
   .header {
     position: relative;
     overflow: hidden;
-    background: #100e2e;
+    background: #1e1b4b;
     color: white;
     padding: 34px 40px 0;
     margin-bottom: 28px;
@@ -94,8 +130,8 @@ const BASE_CSS = `
     bottom: -90px; right: 40px;
     width: 150px; height: 150px;
     border-radius: 50%;
-    border: 22px solid #bef264;
-    opacity: 0.9;
+    border: 22px solid #6ee7b7;
+    opacity: 0.85;
   }
 
   .header .brandrow {
@@ -120,7 +156,7 @@ const BASE_CSS = `
     width: 20px;
     height: 20px;
     border-radius: 6px;
-    background: #bef264;
+    background: #6ee7b7;
     display: inline-block;
   }
 
@@ -129,8 +165,8 @@ const BASE_CSS = `
     font-weight: 800;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #100e2e;
-    background: #bef264;
+    color: #1e1b4b;
+    background: #6ee7b7;
     border-radius: 100px;
     padding: 5px 13px;
   }
@@ -141,19 +177,19 @@ const BASE_CSS = `
     font-weight: 800;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #bef264;
+    color: #6ee7b7;
     margin-bottom: 12px;
   }
 
   .header h1 {
     position: relative;
-    font-family: 'Inter', sans-serif;
-    font-size: 34px;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-size: 36px;
     font-weight: 800;
     color: #ffffff;
     margin-bottom: 22px;
     letter-spacing: -0.02em;
-    line-height: 1.08;
+    line-height: 1.06;
     max-width: 76%;
   }
 
@@ -183,14 +219,171 @@ const BASE_CSS = `
   body { padding: 0 32px 32px; }
 
   h2 {
-    font-size: 13.5px;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-size: 19px;
     font-weight: 800;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
     color: #1e2333;
-    padding-left: 12px;
+    padding-left: 13px;
     border-left: 4px solid #6366f1;
-    margin: 26px 0 12px;
+    margin: 32px 0 14px;
   }
+
+  /* ── Editorial narrative block: big headline + paragraph, no card — the
+     "diagnosis" moment, not another data table ── */
+  .narrative-eyebrow {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #4338ca;
+    margin-bottom: 8px;
+  }
+
+  .narrative-headline {
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-size: 25px;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    line-height: 1.18;
+    color: #1e2333;
+    margin-bottom: 10px;
+    max-width: 85%;
+  }
+
+  .narrative-body {
+    font-size: 12.5px;
+    color: #5b5f70;
+    line-height: 1.65;
+    max-width: 92%;
+  }
+
+  /* ── Dark "investment" band for the number the whole document builds to ── */
+  .mao-band {
+    background: #1e1b4b;
+    color: #ffffff;
+    border-radius: 16px;
+    padding: 26px 28px;
+    margin: 22px 0;
+    page-break-inside: avoid;
+  }
+
+  .mao-band .lbl {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #a5acc9;
+    margin-bottom: 8px;
+  }
+
+  .mao-band .val {
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-size: 38px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .mao-band .bar {
+    width: 44px;
+    height: 4px;
+    border-radius: 2px;
+    background: #6366f1;
+    margin: 14px 0 12px;
+  }
+
+  .mao-band .sub {
+    font-size: 11px;
+    color: #c7cbe8;
+  }
+
+  .mao-band .sub.green { color: #6ee7b7; }
+  .mao-band .sub.red   { color: #fca5a5; }
+
+  /* ── Scenario cards: a 3-up row where the selected condition is highlighted
+     solid, the others stay plain — not another dense table ── */
+  .scenario-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 10px 0 6px;
+  }
+
+  .scenario-card {
+    background: #ffffff;
+    border: 1px solid #e7e9f5;
+    border-radius: 14px;
+    padding: 15px 15px 16px;
+    box-shadow: 0 1px 2px rgba(30, 27, 75, 0.04), 0 4px 14px rgba(30, 27, 75, 0.05);
+  }
+
+  .scenario-card.selected {
+    background: #1e1b4b;
+    border-color: #1e1b4b;
+  }
+
+  .scenario-card .cond {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8b8fa3;
+    margin-bottom: 8px;
+  }
+
+  .scenario-card.selected .cond { color: #a5acc9; }
+
+  .scenario-card .arv {
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    font-size: 17px;
+    font-weight: 800;
+    color: #1e2333;
+    margin-bottom: 10px;
+  }
+
+  .scenario-card.selected .arv { color: #ffffff; }
+
+  .scenario-card .row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: #6b7280;
+    padding: 4px 0;
+  }
+
+  .scenario-card.selected .row { color: #c7cbe8; }
+
+  .scenario-card .row b { color: #1e2333; font-weight: 700; }
+  .scenario-card.selected .row b { color: #ffffff; }
+
+  /* ── Hairline row-list: sequential items without a card/shadow wrapper ── */
+  .row-list { margin: 10px 0 6px; }
+
+  .row-list .r {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 12px 2px;
+    border-bottom: 1px solid #e9e4d8;
+    font-size: 11.5px;
+  }
+
+  .row-list .r:last-child { border-bottom: none; }
+
+  .row-list .r .k { color: #6b7280; }
+  .row-list .r .v { font-weight: 700; color: #1e2333; font-variant-numeric: tabular-nums; }
+
+  .row-list .r.total {
+    font-weight: 800;
+    padding-top: 14px;
+    margin-top: 4px;
+    border-top: 1.5px solid #1e2333;
+    border-bottom: none;
+  }
+
+  .row-list .r.total .k { color: #1e2333; }
+  .row-list .r.total .v { font-size: 13.5px; }
 
   /* ── Card-table: rounded, shadowed container instead of hairline HTML table ── */
   table {
@@ -262,7 +455,7 @@ const BASE_CSS = `
     border-radius: 100px;
     white-space: nowrap;
   }
-  .badge-green { background: #100e2e; color: #bef264; border: 1px solid #100e2e; }
+  .badge-green { background: #1e1b4b; color: #6ee7b7; border: 1px solid #1e1b4b; }
   .badge-amber { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
   .badge-red   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 
@@ -313,7 +506,7 @@ const BASE_CSS = `
   }
 
   .summary-box .val {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
     font-size: 26px;
     font-weight: 800;
     letter-spacing: -0.02em;
@@ -417,17 +610,24 @@ ${buildLetterhead('Deal Sheet', address, [
   <div class="box"><div class="v ${results.monthlyCashFlow >= 300 ? 'green' : results.monthlyCashFlow < 0 ? 'red' : 'amber'}">${results.monthlyCashFlow >= 0 ? '+' : ''}${fmt(results.monthlyCashFlow)}/mo</div><div class="l">Cash Flow</div></div>
 </div>
 
+${(() => {
+  const n = buildNarrative(condLabel, price, flipProfit, results.monthlyCashFlow, mao, results.flipSignal as string, results.rentalSignal as string)
+  return `<div class="no-break">
+  <div class="narrative-eyebrow">The Read</div>
+  <div class="narrative-headline">${esc(n.headline)}</div>
+  <div class="narrative-body">${esc(n.body)}</div>
+</div>`
+})()}
+
 ${sec.mao ? `
 <div class="two-col no-break">
   <div>
     <h2>Deal Parameters</h2>
-    <table>
-      <tr><td>Purchase Price</td><td>${fmt(price)}</td></tr>
-      <tr><td>Rehab Estimate</td><td>${fmt(rehab)}</td></tr>
-      <tr><td>ARV</td><td>${fmt(results.arv)}</td></tr>
-      <tr class="highlight-row"><td><strong>Max Allowable Offer</strong></td><td class="${price <= mao ? 'green' : 'red'}"><strong>${fmt(mao)}</strong></td></tr>
-    </table>
-    <div class="note">${price <= mao ? `Deal is ${fmt(mao - price)} under MAO ✓` : `Deal is ${fmt(price - mao)} over MAO — negotiate down`}</div>
+    <div class="row-list">
+      <div class="r"><span class="k">Purchase Price</span><span class="v">${fmt(price)}</span></div>
+      <div class="r"><span class="k">Rehab Estimate</span><span class="v">${fmt(rehab)}</span></div>
+      <div class="r total"><span class="k">After Repair Value</span><span class="v">${fmt(results.arv)}</span></div>
+    </div>
   </div>` : '<div>'}
 
   <div>
@@ -447,6 +647,14 @@ ${sec.buyhold ? `    <h2>Buy &amp; Hold</h2>
     </table>` : ''}
   </div>
 </div>
+
+${sec.mao ? `
+<div class="mao-band no-break">
+  <div class="lbl">Max Allowable Offer &middot; 70% Rule</div>
+  <div class="val">${fmt(mao)}</div>
+  <div class="bar"></div>
+  <div class="sub ${price <= mao ? 'green' : 'red'}">${price <= mao ? `${fmt(mao - price)} under MAO — room to negotiate` : `${fmt(price - mao)} over MAO — negotiate down to hit the 70% rule`}</div>
+</div>` : ''}
 
 ${sec.brrrr && brrrr ? `
 <h2>BRRRR Refinance Analysis</h2>
@@ -473,12 +681,12 @@ ${sec.brrrr && brrrr ? `
 
 ${sec.cashRequired ? `
 <h2>Total Cash Required</h2>
-<table class="no-break">
-  <tr><td>Down Payment</td><td>${fmt(breakdown?.downPayment ?? 0)}</td></tr>
-  <tr><td>Closing Costs</td><td>${fmt(breakdown?.closingCostsBuy ?? 0)}</td></tr>
-  <tr><td>Rehab</td><td>${fmt(rehab)}</td></tr>
-  <tr class="highlight-row"><td><strong>Total Cash-In</strong></td><td><strong>${fmt((breakdown?.downPayment ?? 0) + (breakdown?.closingCostsBuy ?? 0) + rehab)}</strong></td></tr>
-</table>` : ''}
+<div class="row-list no-break">
+  <div class="r"><span class="k">Down Payment</span><span class="v">${fmt(breakdown?.downPayment ?? 0)}</span></div>
+  <div class="r"><span class="k">Closing Costs</span><span class="v">${fmt(breakdown?.closingCostsBuy ?? 0)}</span></div>
+  <div class="r"><span class="k">Rehab</span><span class="v">${fmt(rehab)}</span></div>
+  <div class="r total"><span class="k">Total Cash-In</span><span class="v">${fmt((breakdown?.downPayment ?? 0) + (breakdown?.closingCostsBuy ?? 0) + rehab)}</span></div>
+</div>` : ''}
 
 ${sec.comps && compsUsed && compsUsed.length > 0 ? `
 <h2>Comparable Sales (ARV Basis)</h2>
@@ -499,20 +707,19 @@ ${sec.comps && compsUsed && compsUsed.length > 0 ? `
 
 ${sec.scenarios && alternatives && alternatives.length > 0 ? `
 <h2>Scenario Analysis — All Conditions</h2>
-<table>
-  <tr><th>Condition</th><th>ARV</th><th>Rehab</th><th>Flip Profit</th><th>Cash Flow</th><th>Signals</th></tr>
+<div class="scenario-cards no-break">
   ${alternatives.map((a: Record<string, unknown>) => {
     const selected = a.condition === condition
-    return `<tr${selected ? ' class="highlight-row"' : ''}>
-      <td>${esc(String(a.condition).charAt(0).toUpperCase() + String(a.condition).slice(1))}${selected ? ' ★' : ''}</td>
-      <td>${fmt(a.arv as number)}</td>
-      <td>${fmt(a.rehabMidpoint as number)}</td>
-      <td class="${(a.flipSignal as string) === 'green' ? 'green' : (a.flipSignal as string) === 'red' ? 'red' : 'amber'}">${(a.flipProfit as number) >= 0 ? '+' : ''}${fmt(a.flipProfit as number)}</td>
-      <td class="${(a.rentalSignal as string) === 'green' ? 'green' : (a.rentalSignal as string) === 'red' ? 'red' : 'amber'}">${(a.monthlyCashFlow as number) >= 0 ? '+' : ''}${fmt(a.monthlyCashFlow as number)}/mo</td>
-      <td>${dot(a.flipSignal as string)} ${dot(a.rentalSignal as string)}</td>
-    </tr>`
+    const condName = esc(String(a.condition).charAt(0).toUpperCase() + String(a.condition).slice(1))
+    return `<div class="scenario-card${selected ? ' selected' : ''}">
+      <div class="cond">${condName}${selected ? ' · Selected' : ''}</div>
+      <div class="arv">${fmt(a.arv as number)}</div>
+      <div class="row"><span>Rehab</span><b>${fmt(a.rehabMidpoint as number)}</b></div>
+      <div class="row"><span>Flip profit</span><b>${(a.flipProfit as number) >= 0 ? '+' : ''}${fmt(a.flipProfit as number)}</b></div>
+      <div class="row"><span>Cash flow</span><b>${(a.monthlyCashFlow as number) >= 0 ? '+' : ''}${fmt(a.monthlyCashFlow as number)}/mo</b></div>
+    </div>`
   }).join('')}
-</table>` : ''}
+</div>` : ''}
 
 ${sec.str && str ? (() => {
   const strSig = str.cashFlowSignal as string ?? 'red'
@@ -707,20 +914,19 @@ function buildFullReport(body: Record<string, unknown>): string {
 
   const altSection = alternatives && alternatives.length > 0 ? `
 <h2>Scenario Analysis — All Conditions</h2>
-<table>
-  <tr><th>Condition</th><th>ARV</th><th>Rehab</th><th>Flip Profit</th><th>Cash Flow</th><th>Signals</th></tr>
+<div class="scenario-cards no-break">
   ${alternatives.map((a: Record<string, unknown>) => {
     const selected = a.condition === condition
-    return `<tr${selected ? ' class="highlight-row"' : ''}>
-      <td>${esc(String(a.condition).charAt(0).toUpperCase() + String(a.condition).slice(1))}${selected ? ' ★' : ''}</td>
-      <td>${fmt(a.arv as number)}</td>
-      <td>${fmt(a.rehabMidpoint as number)}</td>
-      <td class="${(a.flipSignal as string) === 'green' ? 'green' : (a.flipSignal as string) === 'red' ? 'red' : 'amber'}">${(a.flipProfit as number) >= 0 ? '+' : ''}${fmt(a.flipProfit as number)}</td>
-      <td class="${(a.rentalSignal as string) === 'green' ? 'green' : (a.rentalSignal as string) === 'red' ? 'red' : 'amber'}">${(a.monthlyCashFlow as number) >= 0 ? '+' : ''}${fmt(a.monthlyCashFlow as number)}/mo</td>
-      <td>${dot(a.flipSignal as string)} ${dot(a.rentalSignal as string)}</td>
-    </tr>`
+    const condName = esc(String(a.condition).charAt(0).toUpperCase() + String(a.condition).slice(1))
+    return `<div class="scenario-card${selected ? ' selected' : ''}">
+      <div class="cond">${condName}${selected ? ' · Selected' : ''}</div>
+      <div class="arv">${fmt(a.arv as number)}</div>
+      <div class="row"><span>Rehab</span><b>${fmt(a.rehabMidpoint as number)}</b></div>
+      <div class="row"><span>Flip profit</span><b>${(a.flipProfit as number) >= 0 ? '+' : ''}${fmt(a.flipProfit as number)}</b></div>
+      <div class="row"><span>Cash flow</span><b>${(a.monthlyCashFlow as number) >= 0 ? '+' : ''}${fmt(a.monthlyCashFlow as number)}/mo</b></div>
+    </div>`
   }).join('')}
-</table>` : ''
+</div>` : ''
 
   return `<style>${BASE_CSS}</style>
 
@@ -730,27 +936,35 @@ ${buildLetterhead('Full Deal Report', address, [
   { label: 'ARV basis', value: arvNote },
 ])}
 
-<div class="two-col">
-  <div class="summary-box">
-    <div class="lbl">After Repair Value</div>
-    <div class="val">${fmt(r.arv)}</div>
-  </div>
-  <div class="summary-box">
-    <div class="lbl">Max Allowable Offer (MAO)</div>
-    <div class="val ${price <= mao ? 'green' : 'red'}">${fmt(mao)}</div>
-  </div>
+<div class="summary-box">
+  <div class="lbl">After Repair Value</div>
+  <div class="val">${fmt(r.arv)}</div>
 </div>
 
+${(() => {
+  const n = buildNarrative(condLabel, price, flipProfit, r.monthlyCashFlow, mao, r.flipSignal as string, r.rentalSignal as string)
+  return `<div class="no-break">
+  <div class="narrative-eyebrow">The Read</div>
+  <div class="narrative-headline">${esc(n.headline)}</div>
+  <div class="narrative-body">${esc(n.body)}</div>
+</div>`
+})()}
+
 <h2>Property & Deal Parameters</h2>
-<table>
-  <tr><td>Purchase Price</td><td>${fmt(price)}</td></tr>
-  <tr><td>Property Condition</td><td>${condLabel}</td></tr>
-  <tr><td>Rehab Estimate</td><td>${fmt(rehab)}${customRehab && customRehab !== r.rehabEstimate ? ` <span style="font-size:9px;color:#d97706">(custom — AI estimate: ${fmt(r.rehabEstimate)})</span>` : ''}</td></tr>
-  <tr><td>AI Rehab Range</td><td>${fmt(r.rehabLow)} – ${fmt(r.rehabHigh)}</td></tr>
-  <tr><td>ARV Method</td><td>${arvNote}</td></tr>
-  <tr class="highlight-row"><td><strong>Maximum Allowable Offer</strong></td><td class="${price <= mao ? 'green' : 'red'}"><strong>${fmt(mao)}</strong></td></tr>
-</table>
-<div class="note">MAO = ARV × 70% − Rehab. ${price <= mao ? `This deal is ${fmt(mao - price)} under MAO.` : `This deal is ${fmt(price - mao)} over MAO — negotiate down.`}</div>
+<div class="row-list">
+  <div class="r"><span class="k">Purchase Price</span><span class="v">${fmt(price)}</span></div>
+  <div class="r"><span class="k">Property Condition</span><span class="v">${condLabel}</span></div>
+  <div class="r"><span class="k">Rehab Estimate</span><span class="v">${fmt(rehab)}${customRehab && customRehab !== r.rehabEstimate ? ` <span style="font-size:9px;font-weight:600;color:#d97706">(AI est. ${fmt(r.rehabEstimate)})</span>` : ''}</span></div>
+  <div class="r"><span class="k">AI Rehab Range</span><span class="v">${fmt(r.rehabLow)} – ${fmt(r.rehabHigh)}</span></div>
+  <div class="r"><span class="k">ARV Method</span><span class="v">${arvNote}</span></div>
+</div>
+
+<div class="mao-band no-break">
+  <div class="lbl">Maximum Allowable Offer &middot; 70% Rule</div>
+  <div class="val">${fmt(mao)}</div>
+  <div class="bar"></div>
+  <div class="sub ${price <= mao ? 'green' : 'red'}">${price <= mao ? `This deal is ${fmt(mao - price)} under MAO.` : `This deal is ${fmt(price - mao)} over MAO — negotiate down.`}</div>
+</div>
 
 <div class="two-col">
   <div>
@@ -783,12 +997,12 @@ ${buildLetterhead('Full Deal Report', address, [
     </table>
 
     <h2>Total Cash Required</h2>
-    <table>
-      <tr><td>Down Payment</td><td>${fmt(breakdown?.downPayment ?? 0)}</td></tr>
-      <tr><td>Closing Costs</td><td>${fmt(breakdown?.closingCostsBuy ?? 0)}</td></tr>
-      <tr><td>Rehab</td><td>${fmt(rehab)}</td></tr>
-      <tr class="highlight-row"><td><strong>Total Cash-In</strong></td><td><strong>${fmt((breakdown?.downPayment ?? 0) + (breakdown?.closingCostsBuy ?? 0) + rehab)}</strong></td></tr>
-    </table>
+    <div class="row-list">
+      <div class="r"><span class="k">Down Payment</span><span class="v">${fmt(breakdown?.downPayment ?? 0)}</span></div>
+      <div class="r"><span class="k">Closing Costs</span><span class="v">${fmt(breakdown?.closingCostsBuy ?? 0)}</span></div>
+      <div class="r"><span class="k">Rehab</span><span class="v">${fmt(rehab)}</span></div>
+      <div class="r total"><span class="k">Total Cash-In</span><span class="v">${fmt((breakdown?.downPayment ?? 0) + (breakdown?.closingCostsBuy ?? 0) + rehab)}</span></div>
+    </div>
   </div>
 </div>
 
@@ -856,7 +1070,7 @@ export async function POST(req: NextRequest) {
   // Real fonts (loaded by headless Chrome at PDF-render time, or the browser tab in preview
   // mode) so the exported document matches the app's own Playfair/Inter brand typography
   // instead of falling back to system fonts.
-  const fontLink = '<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">'
+  const fontLink = '<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">'
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>${fontLink}</head><body>${innerHtml}</body></html>`
 
   // Preview mode: return HTML for in-browser view
