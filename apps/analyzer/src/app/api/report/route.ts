@@ -71,10 +71,11 @@ const BASE_CSS = `
 
   /* ── Cover hero ── */
   .header {
-    background: linear-gradient(135deg, #4338ca 0%, #6366f1 55%, #818cf8 100%);
-    color: white;
-    padding: 44px 44px 36px;
+    background: #ffffff;
+    color: #1e2333;
+    padding: 40px 44px 28px;
     margin-bottom: 26px;
+    border-bottom: 3px solid #1e1b4b;
     page-break-after: avoid;
   }
 
@@ -82,7 +83,7 @@ const BASE_CSS = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 34px;
+    margin-bottom: 30px;
   }
 
   .header .brand {
@@ -92,14 +93,14 @@ const BASE_CSS = `
     font-size: 12px;
     font-weight: 800;
     letter-spacing: -0.01em;
-    color: #ffffff;
+    color: #1e1b4b;
   }
 
   .header .brand .mark {
     width: 20px;
     height: 20px;
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.95);
+    background: #1e1b4b;
     display: inline-block;
   }
 
@@ -108,8 +109,8 @@ const BASE_CSS = `
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.16);
+    color: #4338ca;
+    background: #eef0fe;
     border-radius: 100px;
     padding: 5px 13px;
   }
@@ -119,15 +120,15 @@ const BASE_CSS = `
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.7);
+    color: #9ca0b3;
     margin-bottom: 10px;
   }
 
   .header h1 {
     font-family: 'Inter', sans-serif;
-    font-size: 30px;
+    font-size: 28px;
     font-weight: 800;
-    color: #ffffff;
+    color: #1e2333;
     margin-bottom: 10px;
     letter-spacing: -0.02em;
     line-height: 1.15;
@@ -136,13 +137,13 @@ const BASE_CSS = `
   .header .meta {
     font-size: 11px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.82);
+    color: #6b7280;
     display: flex;
     align-items: center;
     gap: 9px;
   }
 
-  .header .meta .sep { color: rgba(255, 255, 255, 0.4); }
+  .header .meta .sep { color: #c7cbe8; }
 
   body { padding: 0 32px 32px; }
 
