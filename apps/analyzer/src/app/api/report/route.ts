@@ -29,8 +29,9 @@ const esc = (s: unknown): string =>
     .replace(/'/g, '&#39;')
 
 // ── Shared CSS ────────────────────────────────────────────────────────────────
-// Typography/brand mirrors the app (Playfair Display for display type, Inter for body,
-// brand-500 #6366f1 accent) so an exported document reads as the same product.
+// PandaDoc-style proposal look: full sans-serif (no serif display face), rounded
+// shadowed cards instead of hairline tables, a bold cover-page hero, and a
+// prominent colored "total" bar — not a law-firm/appraisal letterhead.
 const BASE_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -50,10 +51,10 @@ const BASE_CSS = `
     margin: 0;
     padding: 0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-    font-size: 11px;
-    line-height: 1.65;
+    font-size: 12px;
+    line-height: 1.6;
     color: #1e2333;
-    background: #ffffff;
+    background: #f4f5fb;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     font-feature-settings: 'tnum' 1, 'cv11' 1;
@@ -68,134 +69,130 @@ const BASE_CSS = `
   /* Prevent blank trailing page */
   body > *:last-child { margin-bottom: 0 !important; page-break-after: avoid; }
 
-  /* ── Letterhead ── */
+  /* ── Cover hero ── */
   .header {
-    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+    background: linear-gradient(135deg, #4338ca 0%, #6366f1 55%, #818cf8 100%);
     color: white;
-    padding: 28px 40px 24px;
-    margin-bottom: 28px;
+    padding: 44px 44px 36px;
+    margin-bottom: 26px;
     page-break-after: avoid;
-    position: relative;
-  }
-
-  .header::after {
-    content: '';
-    position: absolute;
-    left: 0; right: 0; bottom: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #818cf8, #6366f1 40%, #a5b4fc);
   }
 
   .header .brandrow {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
+    margin-bottom: 34px;
   }
 
   .header .brand {
     display: flex;
     align-items: center;
-    gap: 7px;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #e0e7ff;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #ffffff;
   }
 
   .header .brand .mark {
-    width: 14px;
-    height: 14px;
-    border-radius: 4px;
-    background: linear-gradient(135deg, #a5b4fc, #6366f1);
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.95);
     display: inline-block;
   }
 
   .header .doctype {
-    font-size: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 100px;
+    padding: 5px 13px;
+  }
+
+  .header .eyebrow {
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #c7d2fe;
-    border: 1px solid rgba(199, 210, 254, 0.4);
-    border-radius: 100px;
-    padding: 4px 11px;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 10px;
   }
 
   .header h1 {
-    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
-    font-size: 23px;
-    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    font-size: 30px;
+    font-weight: 800;
     color: #ffffff;
-    margin-bottom: 6px;
-    letter-spacing: -0.01em;
+    margin-bottom: 10px;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
   }
 
   .header .meta {
-    font-size: 9.5px;
-    color: #a5b4fc;
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.82);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
   }
 
-  .header .meta .sep { color: #4f46e5; }
+  .header .meta .sep { color: rgba(255, 255, 255, 0.4); }
 
-  body { padding: 0 40px 28px; }
+  body { padding: 0 32px 32px; }
 
   h2 {
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.13em;
-    text-transform: uppercase;
-    color: #4338ca;
-    border-bottom: 1.5px solid #e0e4f5;
-    padding-bottom: 6px;
-    margin: 22px 0 11px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    font-size: 13.5px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #1e2333;
+    padding-left: 12px;
+    border-left: 4px solid #6366f1;
+    margin: 26px 0 12px;
   }
 
-  h2::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 1.5px;
-    background: #6366f1;
-    display: inline-block;
-  }
-
+  /* ── Card-table: rounded, shadowed container instead of hairline HTML table ── */
   table {
     width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 4px;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-bottom: 6px;
+    background: #ffffff;
+    border: 1px solid #e7e9f5;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(30, 27, 75, 0.04), 0 4px 14px rgba(30, 27, 75, 0.05);
   }
 
   th {
     text-align: left;
-    font-size: 8.5px;
+    font-size: 9px;
     font-weight: 700;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #6b7280;
-    padding: 6px 10px;
+    color: #8b8fa3;
+    padding: 10px 16px;
     background: #f7f8fc;
-    border-bottom: 1.5px solid #e0e4f5;
+    border-bottom: 1px solid #eef0f7;
   }
 
   td {
-    padding: 7px 10px;
-    border-bottom: 1px solid #eef0f7;
+    padding: 11px 16px;
     color: #374151;
     vertical-align: top;
     font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
   }
 
-  tr:last-child td { border-bottom: none; }
+  tbody tr:not(:last-child) td { border-bottom: 1px solid #f1f2f9; }
+  tbody tr:nth-child(even) td { background: #fafafe; }
 
-  td:last-child { text-align: right; font-weight: 600; color: #1e2333; }
+  td:last-child { text-align: right; font-weight: 700; color: #1e2333; }
   th:last-child { text-align: right; }
 
   .green  { color: #059669; }
@@ -208,21 +205,24 @@ const BASE_CSS = `
   td.red,   td:last-child.red   { color: #dc2626; }
   td.amber, td:last-child.amber { color: #d97706; }
 
+  /* Proposal-style "total" bar — bold, full-width, colored, not just a tinted row */
   .highlight-row td {
-    background: #f5f6fe;
-    font-weight: 700;
-    border-top: 1.5px solid #dbdefb;
-    border-bottom: 1.5px solid #dbdefb;
+    background: #eef0fe !important;
+    font-weight: 800;
+    font-size: 13px;
+    padding-top: 13px;
+    padding-bottom: 13px;
   }
+  .highlight-row td:first-child { color: #312e81; }
 
   /* ── Status badges (replace emoji signal dots) ── */
   .badge {
     display: inline-block;
-    font-size: 8px;
+    font-size: 9px;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     text-transform: uppercase;
-    padding: 2.5px 8px;
+    padding: 4px 11px;
     border-radius: 100px;
     white-space: nowrap;
   }
@@ -232,9 +232,9 @@ const BASE_CSS = `
 
   .footer {
     margin-top: 30px;
-    padding-top: 12px;
-    border-top: 1px solid #e0e4f5;
-    font-size: 8.5px;
+    padding: 18px 4px 4px;
+    border-top: 1px solid #e2e4f0;
+    font-size: 9px;
     color: #9ca3af;
     display: flex;
     align-items: center;
@@ -246,41 +246,43 @@ const BASE_CSS = `
     display: flex;
     align-items: center;
     gap: 6px;
-    font-weight: 600;
+    font-weight: 700;
     color: #6b7280;
   }
 
   .footer .footer-brand .mark {
-    width: 9px;
-    height: 9px;
-    border-radius: 2.5px;
-    background: linear-gradient(135deg, #a5b4fc, #6366f1);
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: linear-gradient(135deg, #818cf8, #4338ca);
     display: inline-block;
   }
 
   .two-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: 16px;
     page-break-inside: avoid;
   }
 
+  /* ── Stat cards ── */
   .summary-box {
-    background: #f7f8fc;
-    border: 1px solid #e0e4f5;
-    border-top: 3px solid #6366f1;
-    border-radius: 8px;
-    padding: 14px 16px;
-    margin-bottom: 18px;
+    background: #ffffff;
+    border: 1px solid #e7e9f5;
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(30, 27, 75, 0.04), 0 4px 14px rgba(30, 27, 75, 0.05);
     page-break-inside: avoid;
   }
 
   .summary-box .val {
-    font-family: 'Playfair Display', Georgia, serif;
-    font-size: 22px;
-    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
     color: #1e2333;
-    line-height: 1.2;
+    line-height: 1.15;
   }
 
   .summary-box .val.green { color: #059669; }
@@ -288,25 +290,26 @@ const BASE_CSS = `
   .summary-box .val.amber { color: #d97706; }
 
   .summary-box .lbl {
-    font-size: 8.5px;
+    font-size: 9px;
     text-transform: uppercase;
-    letter-spacing: 0.11em;
-    font-weight: 600;
-    color: #8b8fa3;
-    margin-bottom: 4px;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: #9ca0b3;
+    margin-bottom: 6px;
   }
 
-  .note { font-size: 8.5px; color: #8b8fa3; margin-top: 6px; font-style: italic; }
+  .note { font-size: 9.5px; color: #9ca0b3; margin-top: 7px; }
 `
 
-// Shared letterhead markup for all report types — keeps branding consistent.
+// Shared cover-hero markup for all report types — keeps branding consistent.
 function buildLetterhead(docType: string, address: string, metaParts: string[]): string {
-  const meta = metaParts.filter(Boolean).map(esc).join('<span class="sep">·</span>')
+  const meta = metaParts.filter(Boolean).map(esc).join('<span class="sep">&bull;</span>')
   return `<div class="header">
   <div class="brandrow">
     <div class="brand"><span class="mark"></span>ClearPath Analyzer</div>
     <div class="doctype">${esc(docType)}</div>
   </div>
+  <div class="eyebrow">Prepared for</div>
   <h1>${esc(address)}</h1>
   <div class="meta">${meta}</div>
 </div>`
@@ -348,18 +351,18 @@ function buildDealSheet(body: Record<string, unknown>): string {
 
   return `<style>${BASE_CSS}
     .hero { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
-    .hero .box { text-align:center; background:#f7f8fc; border:1px solid #e0e4f5; border-top:3px solid #6366f1; border-radius:8px; padding:14px 8px; }
-    .hero .box .v { font-family:'Playfair Display', Georgia, serif; font-size:19px; font-weight:600; color:#1e2333; }
+    .hero .box { text-align:center; background:#ffffff; border:1px solid #e7e9f5; border-radius:14px; padding:16px 10px; box-shadow: 0 1px 2px rgba(30,27,75,0.04), 0 4px 14px rgba(30,27,75,0.05); }
+    .hero .box .v { font-family:'Inter', sans-serif; font-size:20px; font-weight:800; letter-spacing:-0.01em; color:#1e2333; }
     .hero .box .v.green { color:#059669; }
     .hero .box .v.red   { color:#dc2626; }
     .hero .box .v.amber { color:#d97706; }
-    .hero .box .l { font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.11em; color:#8b8fa3; margin-top:4px; }
+    .hero .box .l { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.09em; color:#9ca0b3; margin-top:5px; }
     .brrrr-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:8px 0 12px; }
-    .brrrr-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:11px 8px; text-align:center; }
-    .brrrr-box.warn { background:#fffbeb; border-color:#fde68a; }
-    .brrrr-box.bad { background:#fff1f2; border-color:#fecdd3; }
-    .brrrr-box .bv { font-size:15px; font-weight:700; color:#1e2333; }
-    .brrrr-box .bl { font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:#8b8fa3; margin-top:3px; }
+    .brrrr-box { background:#ffffff; border:1px solid #e7e9f5; border-radius:12px; padding:13px 10px; text-align:center; box-shadow: 0 1px 2px rgba(30,27,75,0.04), 0 4px 14px rgba(30,27,75,0.05); }
+    .brrrr-box.warn { background:#fffdf7; border-color:#fde68a; }
+    .brrrr-box.bad { background:#fffbfb; border-color:#fecdd3; }
+    .brrrr-box .bv { font-size:16px; font-weight:800; color:#1e2333; }
+    .brrrr-box .bl { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#9ca0b3; margin-top:4px; }
   </style>
 
 ${buildLetterhead('Deal Sheet', address, [today, `${condLabel} Condition`, arvNote])}
@@ -536,24 +539,30 @@ function buildOfferLetter(body: Record<string, unknown>): string {
 
   return `<style>${BASE_CSS}
     .letter-body { padding-top: 4px; }
-    .letter-body p { margin-bottom: 13px; }
-    .letter-dateline { font-size: 10px; color: #6b7280; text-align: right; margin-bottom: 18px; }
+    .letter-body > p { margin-bottom: 14px; background: #ffffff; border: 1px solid #e7e9f5; border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 2px rgba(30,27,75,0.04), 0 4px 14px rgba(30,27,75,0.05); }
+    .letter-dateline { font-size: 10.5px; font-weight: 600; color: #8b8fa3; text-align: right; margin-bottom: 16px; }
     .letter-re {
-      font-size: 10px; margin-bottom: 18px; padding: 10px 14px;
-      background: #f7f8fc; border-left: 3px solid #6366f1; border-radius: 0 6px 6px 0;
+      font-size: 11px; font-weight: 600; margin-bottom: 18px; padding: 13px 18px;
+      background: #eef0fe; border-radius: 12px; color: #312e81;
     }
-    .letter-re .label { font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 8px; color: #4338ca; margin-right: 6px; }
+    .letter-re .label { font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; font-size: 8.5px; color: #4338ca; margin-right: 8px; }
     .terms-table { margin: 16px 0; }
     .terms-table tr.price-row td {
-      background: #f5f6fe; font-weight: 700; font-size: 12px;
-      border-top: 1.5px solid #dbdefb; border-bottom: 1.5px solid #dbdefb;
+      background: #eef0fe !important; font-weight: 800; font-size: 13px;
+      padding-top: 14px; padding-bottom: 14px;
     }
-    .terms-table tr.price-row td:first-child { color: #1e2333; }
-    .terms-table tr.price-row td:last-child { color: #4338ca; font-family: 'Playfair Display', Georgia, serif; font-size: 15px; }
+    .terms-table tr.price-row td:first-child { color: #312e81; }
+    .terms-table tr.price-row td:last-child { color: #4338ca; font-family: 'Inter', sans-serif; font-size: 17px; letter-spacing: -0.01em; }
     .closing { margin-top: 22px; }
-    .sign-grid { display:grid; grid-template-columns:1fr 1fr; gap:32px; margin-top:20px; }
-    .sign-line { border-top:1px solid #cbd0e0; margin-top:40px; padding-top:7px; font-size:9px; color:#6b7280; }
-    .sign-line .who { display: block; font-weight: 600; color: #374151; font-size: 9.5px; margin-bottom: 1px; }
+    .closing > p { background: none; border: none; padding: 0; box-shadow: none; }
+    .sign-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+    .sign-box {
+      background: #ffffff; border: 1.5px dashed #c7cbe8; border-radius: 12px;
+      padding: 14px 16px 16px;
+    }
+    .sign-box .sign-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #9ca0b3; margin-bottom: 22px; }
+    .sign-line { border-top:1px solid #cbd0e0; padding-top:7px; font-size:9px; color:#6b7280; }
+    .sign-line .who { display: block; font-weight: 700; color: #1e2333; font-size: 10px; margin-bottom: 1px; }
   </style>
 
 ${buildLetterhead('Purchase Offer / Letter of Intent', address, [`Offer expires ${expiresLabel}`, `${inspection}-day inspection`, 'Cash, as-is'])}
@@ -583,13 +592,15 @@ ${buildLetterhead('Purchase Offer / Letter of Intent', address, [`Offer expires 
 <p>If these terms are acceptable, please sign below or contact Buyer directly to discuss. Buyer looks forward to the opportunity to work with you.</p>
 
 <div class="closing no-break">
-<p style="margin-bottom: 30px;">Sincerely,</p>
+<p style="margin-bottom: 18px;">Sincerely,</p>
 
 <div class="sign-grid">
-  <div>
+  <div class="sign-box">
+    <div class="sign-label">Buyer signature</div>
     <div class="sign-line"><span class="who">${esc(buyer)}</span>Buyer &nbsp;&nbsp;·&nbsp;&nbsp; Date</div>
   </div>
-  <div>
+  <div class="sign-box">
+    <div class="sign-label">Seller signature</div>
     <div class="sign-line"><span class="who">&nbsp;</span>Seller / Owner of Record &nbsp;&nbsp;·&nbsp;&nbsp; Date</div>
   </div>
 </div>
