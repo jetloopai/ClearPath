@@ -10,12 +10,14 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const {
-    analysisId, address, buyerName, offerPrice, earnestMoney, closingDays,
+    analysisId, address, buyerName, buyerRepresentativeName, sellerName, offerPrice, earnestMoney, closingDays,
     inspectionDays, expirationDays, arv, rehabEstimate, mao, sellerEmail,
   } = body as {
     analysisId?: string
     address: string
     buyerName: string
+    buyerRepresentativeName?: string
+    sellerName?: string
     offerPrice: number
     earnestMoney: number
     closingDays: number
@@ -51,6 +53,8 @@ export async function POST(req: NextRequest) {
       user_id: userId,
       address,
       buyer_name: buyerName.trim(),
+      buyer_representative_name: buyerRepresentativeName?.trim() || null,
+      seller_name: sellerName?.trim() || null,
       offer_price: Math.round(offerPrice),
       earnest_money: earnest,
       closing_days: closing,

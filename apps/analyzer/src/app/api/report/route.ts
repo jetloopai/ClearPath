@@ -759,13 +759,16 @@ ${FOOTER_HTML}`
 function buildOfferLetter(body: Record<string, unknown>): string {
   const {
     address, results, customRehab,
-    buyerName, offerPrice, earnestMoney, closingDays, expirationDays, inspectionDays,
+    buyerName, buyerRepresentativeName, sellerName,
+    offerPrice, earnestMoney, closingDays, expirationDays, inspectionDays,
     signatureDataUrl, signerName, signedAt, createdAt,
   } = body as {
     address: string
     results: Record<string, number & string>
     customRehab: number
     buyerName: string
+    buyerRepresentativeName?: string
+    sellerName?: string
     offerPrice: number
     earnestMoney: number
     closingDays: number
@@ -785,6 +788,8 @@ function buildOfferLetter(body: Record<string, unknown>): string {
   const inspection = inspectionDays && inspectionDays > 0 ? Math.round(inspectionDays) : 5
   const expiration = expirationDays && expirationDays > 0 ? Math.round(expirationDays) : 3
   const buyer = (buyerName ?? '').trim() || 'Buyer'
+  const buyerRep = (buyerRepresentativeName ?? '').trim()
+  const seller = (sellerName ?? '').trim()
 
   // Anchor closing/expiration dates to when the offer was actually created, not
   // "now" — otherwise re-downloading a signed offer weeks later would compute a
@@ -838,9 +843,9 @@ ${buildLetterhead('Purchase Offer / Letter of Intent', address, [
 
 <div class="letter-re"><span class="label">Re</span>Purchase Offer for ${esc(address)}</div>
 
-<p>To the Owner of Record of the property located at <strong>${esc(address)}</strong> (the "Property"):</p>
+<p>${seller ? `Dear ${esc(seller)},` : `To the Owner of Record of the property located at <strong>${esc(address)}</strong> (the "Property"):`}</p>
 
-<p>${esc(buyer)} ("Buyer") is pleased to submit the following offer to purchase the Property on an as-is, cash basis, subject to the terms below.</p>
+<p>${esc(buyer)}${buyerRep ? `, by its representative ${esc(buyerRep)},` : ''} ("Buyer") is pleased to submit the following offer to purchase the Property on an as-is, cash basis, subject to the terms below.</p>
 
 <table class="terms-table">
   <tr class="price-row"><td>Purchase Price</td><td>${fmt(price)}</td></tr>
@@ -863,7 +868,7 @@ ${buildLetterhead('Purchase Offer / Letter of Intent', address, [
 <div class="sign-grid">
   <div class="sign-box">
     <div class="sign-label">Buyer signature</div>
-    <div class="sign-line"><span class="who">${esc(buyer)}</span>Buyer &nbsp;&nbsp;·&nbsp;&nbsp; Date</div>
+    <div class="sign-line"><span class="who">${esc(buyer)}${buyerRep ? `<br/>By: ${esc(buyerRep)}` : ''}</span>Buyer &nbsp;&nbsp;·&nbsp;&nbsp; Date</div>
   </div>
   <div class="sign-box${signatureDataUrl ? ' signed' : ''}">
     <div class="sign-label">Seller signature${signatureDataUrl ? ' · Signed electronically' : ''}</div>

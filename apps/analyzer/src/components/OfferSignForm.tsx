@@ -6,13 +6,14 @@ import { SignaturePad, type SignaturePadHandle } from "@/components/SignaturePad
 
 interface OfferSignFormProps {
   offerId: string;
+  initialSignerName?: string;
 }
 
-export function OfferSignForm({ offerId }: OfferSignFormProps) {
+export function OfferSignForm({ offerId, initialSignerName }: OfferSignFormProps) {
   const router = useRouter();
   const padRef = useRef<SignaturePadHandle>(null);
   const [hasSignature, setHasSignature] = useState(false);
-  const [signerName, setSignerName] = useState("");
+  const [signerName, setSignerName] = useState(initialSignerName ?? "");
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -22,9 +23,9 @@ export function OfferSignForm({ offerId }: OfferSignFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
-    const signatureDataUrl = padRef.current?.getDataUrl();
+    const signatureDataUrl = await padRef.current?.getDataUrl();
     if (!signatureDataUrl) {
-      setError("Please draw your signature first.");
+      setError("Please draw or type your signature first.");
       return;
     }
 

@@ -159,6 +159,8 @@ export default function ResultsView() {
   const [leadError, setLeadError] = useState("");
   const [downloading, setDownloading] = useState<"deal_sheet" | "full_report" | "offer_letter" | null>(null);
   const [offerBuyerName, setOfferBuyerName] = useState("");
+  const [offerBuyerRepName, setOfferBuyerRepName] = useState("");
+  const [offerSellerName, setOfferSellerName] = useState("");
   const [offerPriceOverride, setOfferPriceOverride] = useState<number | null>(null);
   const [offerEarnestMoney, setOfferEarnestMoney] = useState(1000);
   const [offerClosingDays, setOfferClosingDays] = useState(21);
@@ -513,6 +515,8 @@ export default function ResultsView() {
     customRehab,
     // Offer letter fields (ignored by deal_sheet / full_report)
     buyerName: offerBuyerName,
+    buyerRepresentativeName: offerBuyerRepName,
+    sellerName: offerSellerName,
     offerPrice: offerPriceOverride ?? analysis!.results.mao,
     earnestMoney: offerEarnestMoney,
     closingDays: offerClosingDays,
@@ -641,6 +645,8 @@ export default function ResultsView() {
           analysisId: analysis.analysisId,
           address: analysis.address,
           buyerName: offerBuyerName,
+          buyerRepresentativeName: offerBuyerRepName.trim() || undefined,
+          sellerName: offerSellerName.trim() || undefined,
           offerPrice: offerPriceOverride ?? analysis.results.mao,
           earnestMoney: offerEarnestMoney,
           closingDays: offerClosingDays,
@@ -2565,6 +2571,28 @@ export default function ResultsView() {
                         offerBuyerName.trim() ? "border-white/[0.07] focus:border-indigo-500/40" : "border-amber-500/30 focus:border-amber-500/50"
                       }`}
                     />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-1">Representative (if company)</label>
+                      <input
+                        type="text"
+                        value={offerBuyerRepName}
+                        onChange={(e) => setOfferBuyerRepName(e.target.value)}
+                        placeholder="e.g. Jane Smith, Manager"
+                        className="w-full px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.07] text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-1">Seller name (optional)</label>
+                      <input
+                        type="text"
+                        value={offerSellerName}
+                        onChange={(e) => setOfferSellerName(e.target.value)}
+                        placeholder="e.g. John Doe"
+                        className="w-full px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.07] text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/40"
+                      />
+                    </div>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>

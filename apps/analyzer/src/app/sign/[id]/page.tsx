@@ -30,9 +30,9 @@ export default async function SignOfferPage({ params }: { params: { id: string }
   const { data: offer } = await supabaseAdmin
     .from('offers')
     .select(`
-      id, address, buyer_name, offer_price, earnest_money, closing_days, inspection_days,
-      expiration_days, arv, rehab_estimate, mao, seller_email, status, expires_at,
-      signed_at, signer_name, signature_data, created_at
+      id, address, buyer_name, buyer_representative_name, seller_name, offer_price, earnest_money,
+      closing_days, inspection_days, expiration_days, arv, rehab_estimate, mao, seller_email, status,
+      expires_at, signed_at, signer_name, signature_data, created_at
     `)
     .eq('id', params.id)
     .single()
@@ -42,10 +42,15 @@ export default async function SignOfferPage({ params }: { params: { id: string }
   const isSigned = offer.status === 'signed'
   const isExpired = !isSigned && new Date(offer.expires_at) < new Date()
   const closingDate = new Date(new Date(offer.created_at).getTime() + offer.closing_days * 24 * 60 * 60 * 1000)
+  const buyerLabel = offer.buyer_representative_name
+    ? `${offer.buyer_name} (${offer.buyer_representative_name})`
+    : offer.buyer_name
 
   const reportPayload = {
     address: offer.address,
     buyerName: offer.buyer_name,
+    buyerRepresentativeName: offer.buyer_representative_name,
+    sellerName: offer.seller_name,
     offerPrice: offer.offer_price,
     earnestMoney: offer.earnest_money,
     closingDays: offer.closing_days,
@@ -69,7 +74,9 @@ export default async function SignOfferPage({ params }: { params: { id: string }
           </Link>
           <div className="text-xs uppercase tracking-widest text-zinc-600 mb-3 mt-6">Purchase Offer</div>
           <h1 className="text-2xl md:text-3xl font-light text-zinc-200 mb-2">{offer.address}</h1>
-          <p className="text-xs text-zinc-600">From {offer.buyer_name}</p>
+          <p className="text-xs text-zinc-600">
+            {offer.seller_name ? `${offer.seller_name}, y` : "Y"}ou've received an offer from {buyerLabel}
+          </p>
         </div>
 
         <div className="glass-panel rounded-2xl p-6 border border-white/[0.06] mb-6">
@@ -103,7 +110,7 @@ export default async function SignOfferPage({ params }: { params: { id: string }
               This offer is submitted for your consideration and does not constitute a binding contract until a
               formal purchase and sale agreement is signed by both parties. Offer expires {fmtDate(offer.expires_at)}.
             </p>
-            <OfferSignForm offerId={offer.id} />
+            <OfferSignForm offerId={offer.id} initialSignerName={offer.seller_name ?? undefined} />
           </div>
         )}
 
