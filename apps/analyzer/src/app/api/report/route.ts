@@ -198,15 +198,15 @@ const BASE_CSS = `
   td:last-child { text-align: right; font-weight: 600; color: #1e2333; }
   th:last-child { text-align: right; }
 
-  .green  { color: #047857; }
-  .red    { color: #b91c1c; }
-  .amber  { color: #b45309; }
+  .green  { color: #059669; }
+  .red    { color: #dc2626; }
+  .amber  { color: #d97706; }
 
   /* Outrank td:last-child's own color rule so signal coloring actually shows on the
      right-aligned numeric cells it's applied to. */
-  td.green, td:last-child.green { color: #047857; }
-  td.red,   td:last-child.red   { color: #b91c1c; }
-  td.amber, td:last-child.amber { color: #b45309; }
+  td.green, td:last-child.green { color: #059669; }
+  td.red,   td:last-child.red   { color: #dc2626; }
+  td.amber, td:last-child.amber { color: #d97706; }
 
   .highlight-row td {
     background: #f5f6fe;
@@ -226,9 +226,9 @@ const BASE_CSS = `
     border-radius: 100px;
     white-space: nowrap;
   }
-  .badge-green { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
-  .badge-amber { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-  .badge-red   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .badge-green { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+  .badge-amber { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+  .badge-red   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 
   .footer {
     margin-top: 30px;
@@ -283,9 +283,9 @@ const BASE_CSS = `
     line-height: 1.2;
   }
 
-  .summary-box .val.green { color: #047857; }
-  .summary-box .val.red   { color: #b91c1c; }
-  .summary-box .val.amber { color: #b45309; }
+  .summary-box .val.green { color: #059669; }
+  .summary-box .val.red   { color: #dc2626; }
+  .summary-box .val.amber { color: #d97706; }
 
   .summary-box .lbl {
     font-size: 8.5px;
@@ -350,9 +350,9 @@ function buildDealSheet(body: Record<string, unknown>): string {
     .hero { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
     .hero .box { text-align:center; background:#f7f8fc; border:1px solid #e0e4f5; border-top:3px solid #6366f1; border-radius:8px; padding:14px 8px; }
     .hero .box .v { font-family:'Playfair Display', Georgia, serif; font-size:19px; font-weight:600; color:#1e2333; }
-    .hero .box .v.green { color:#047857; }
-    .hero .box .v.red   { color:#b91c1c; }
-    .hero .box .v.amber { color:#b45309; }
+    .hero .box .v.green { color:#059669; }
+    .hero .box .v.red   { color:#dc2626; }
+    .hero .box .v.amber { color:#d97706; }
     .hero .box .l { font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.11em; color:#8b8fa3; margin-top:4px; }
     .brrrr-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:8px 0 12px; }
     .brrrr-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:11px 8px; text-align:center; }
