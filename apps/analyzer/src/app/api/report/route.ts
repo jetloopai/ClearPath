@@ -5,8 +5,15 @@ const fmt = (v: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v)
 
 const signal = (s: string, label: string) => {
-  const icon = s === 'green' ? '🟢' : s === 'yellow' ? '🟡' : '🔴'
-  return `${icon} ${label}`
+  const cls = s === 'green' ? 'badge-green' : s === 'yellow' ? 'badge-amber' : 'badge-red'
+  return `<span class="badge ${cls}">${esc(label)}</span>`
+}
+
+// Compact colored dot for dense table cells (e.g. a "Signals" column with two indicators) —
+// a full text badge is too wide there.
+const dot = (s: string) => {
+  const color = s === 'green' ? '#10b981' : s === 'yellow' ? '#f59e0b' : '#ef4444'
+  return `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};"></span>`
 }
 
 const slug = (s: string) =>
@@ -22,6 +29,8 @@ const esc = (s: unknown): string =>
     .replace(/'/g, '&#39;')
 
 // ── Shared CSS ────────────────────────────────────────────────────────────────
+// Typography/brand mirrors the app (Playfair Display for display type, Inter for body,
+// brand-500 #6366f1 accent) so an exported document reads as the same product.
 const BASE_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -40,13 +49,14 @@ const BASE_CSS = `
   html, body {
     margin: 0;
     padding: 0;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
     font-size: 11px;
-    line-height: 1.6;
-    color: #1a1a2e;
+    line-height: 1.65;
+    color: #1e2333;
     background: #ffffff;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    font-feature-settings: 'tnum' 1, 'cv11' 1;
   }
 
   /* ── Page-break rules ── */
@@ -58,45 +68,103 @@ const BASE_CSS = `
   /* Prevent blank trailing page */
   body > *:last-child { margin-bottom: 0 !important; page-break-after: avoid; }
 
+  /* ── Letterhead ── */
   .header {
-    background: #1a1a2e;
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
     color: white;
-    padding: 24px 36px;
-    margin-bottom: 24px;
+    padding: 28px 40px 24px;
+    margin-bottom: 28px;
     page-break-after: avoid;
+    position: relative;
+  }
+
+  .header::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #818cf8, #6366f1 40%, #a5b4fc);
+  }
+
+  .header .brandrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
   }
 
   .header .brand {
-    font-size: 9px;
-    letter-spacing: 0.2em;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #818cf8;
-    margin-bottom: 5px;
+    color: #e0e7ff;
+  }
+
+  .header .brand .mark {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: linear-gradient(135deg, #a5b4fc, #6366f1);
+    display: inline-block;
+  }
+
+  .header .doctype {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #c7d2fe;
+    border: 1px solid rgba(199, 210, 254, 0.4);
+    border-radius: 100px;
+    padding: 4px 11px;
   }
 
   .header h1 {
-    font-size: 18px;
-    font-weight: 700;
-    color: #f1f5f9;
-    margin-bottom: 4px;
+    font-family: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    font-size: 23px;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
   }
 
   .header .meta {
     font-size: 9.5px;
-    color: #94a3b8;
+    color: #a5b4fc;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
-  body { padding: 0 36px 24px; }
+  .header .meta .sep { color: #4f46e5; }
+
+  body { padding: 0 40px 28px; }
 
   h2 {
     font-size: 9px;
     font-weight: 700;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.13em;
     text-transform: uppercase;
-    color: #6366f1;
-    border-bottom: 1px solid #e2e8f0;
-    padding-bottom: 5px;
-    margin: 20px 0 10px;
+    color: #4338ca;
+    border-bottom: 1.5px solid #e0e4f5;
+    padding-bottom: 6px;
+    margin: 22px 0 11px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  h2::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 1.5px;
+    background: #6366f1;
+    display: inline-block;
   }
 
   table {
@@ -109,74 +177,145 @@ const BASE_CSS = `
     text-align: left;
     font-size: 8.5px;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
-    color: #94a3b8;
-    padding: 5px 10px;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
+    color: #6b7280;
+    padding: 6px 10px;
+    background: #f7f8fc;
+    border-bottom: 1.5px solid #e0e4f5;
   }
 
   td {
-    padding: 6px 10px;
-    border-bottom: 1px solid #f1f5f9;
-    color: #334155;
+    padding: 7px 10px;
+    border-bottom: 1px solid #eef0f7;
+    color: #374151;
     vertical-align: top;
+    font-variant-numeric: tabular-nums;
   }
 
-  td:last-child { text-align: right; font-weight: 600; color: #1e293b; }
+  tr:last-child td { border-bottom: none; }
+
+  td:last-child { text-align: right; font-weight: 600; color: #1e2333; }
   th:last-child { text-align: right; }
 
-  .green  { color: #059669; }
-  .red    { color: #dc2626; }
-  .amber  { color: #d97706; }
+  .green  { color: #047857; }
+  .red    { color: #b91c1c; }
+  .amber  { color: #b45309; }
 
-  .highlight-row td { background: #f0f9ff; font-weight: 600; }
+  /* Outrank td:last-child's own color rule so signal coloring actually shows on the
+     right-aligned numeric cells it's applied to. */
+  td.green, td:last-child.green { color: #047857; }
+  td.red,   td:last-child.red   { color: #b91c1c; }
+  td.amber, td:last-child.amber { color: #b45309; }
+
+  .highlight-row td {
+    background: #f5f6fe;
+    font-weight: 700;
+    border-top: 1.5px solid #dbdefb;
+    border-bottom: 1.5px solid #dbdefb;
+  }
+
+  /* ── Status badges (replace emoji signal dots) ── */
+  .badge {
+    display: inline-block;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2.5px 8px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+  .badge-green { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+  .badge-amber { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+  .badge-red   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 
   .footer {
-    margin-top: 28px;
-    padding-top: 10px;
-    border-top: 1px solid #e2e8f0;
+    margin-top: 30px;
+    padding-top: 12px;
+    border-top: 1px solid #e0e4f5;
     font-size: 8.5px;
-    color: #94a3b8;
+    color: #9ca3af;
     display: flex;
+    align-items: center;
     justify-content: space-between;
     page-break-inside: avoid;
+  }
+
+  .footer .footer-brand {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  .footer .footer-brand .mark {
+    width: 9px;
+    height: 9px;
+    border-radius: 2.5px;
+    background: linear-gradient(135deg, #a5b4fc, #6366f1);
+    display: inline-block;
   }
 
   .two-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 18px;
+    gap: 20px;
     page-break-inside: avoid;
   }
 
   .summary-box {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    padding: 12px 14px;
+    background: #f7f8fc;
+    border: 1px solid #e0e4f5;
+    border-top: 3px solid #6366f1;
+    border-radius: 8px;
+    padding: 14px 16px;
     margin-bottom: 18px;
     page-break-inside: avoid;
   }
 
   .summary-box .val {
-    font-size: 20px;
-    font-weight: 700;
-    color: #1e293b;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: #1e2333;
     line-height: 1.2;
   }
+
+  .summary-box .val.green { color: #047857; }
+  .summary-box .val.red   { color: #b91c1c; }
+  .summary-box .val.amber { color: #b45309; }
 
   .summary-box .lbl {
     font-size: 8.5px;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #94a3b8;
-    margin-bottom: 3px;
+    letter-spacing: 0.11em;
+    font-weight: 600;
+    color: #8b8fa3;
+    margin-bottom: 4px;
   }
 
-  .note { font-size: 8.5px; color: #94a3b8; margin-top: 5px; font-style: italic; }
+  .note { font-size: 8.5px; color: #8b8fa3; margin-top: 6px; font-style: italic; }
 `
+
+// Shared letterhead markup for all report types — keeps branding consistent.
+function buildLetterhead(docType: string, address: string, metaParts: string[]): string {
+  const meta = metaParts.filter(Boolean).map(esc).join('<span class="sep">·</span>')
+  return `<div class="header">
+  <div class="brandrow">
+    <div class="brand"><span class="mark"></span>ClearPath Analyzer</div>
+    <div class="doctype">${esc(docType)}</div>
+  </div>
+  <h1>${esc(address)}</h1>
+  <div class="meta">${meta}</div>
+</div>`
+}
+
+const FOOTER_HTML = `<div class="footer">
+  <span class="footer-brand"><span class="mark"></span>Generated by ClearPath Analyzer &nbsp;·&nbsp; clearpathassetgroup.com</span>
+  <span>Estimates are for educational purposes only. Not financial advice.</span>
+</div>`
 
 // ── DEAL SHEET (compact, section-toggleable) ──────────────────────────────────
 function buildDealSheet(body: Record<string, unknown>): string {
@@ -208,23 +347,22 @@ function buildDealSheet(body: Record<string, unknown>): string {
   const brrrrColor = brrrrSig === 'green' ? '#059669' : brrrrSig === 'yellow' ? '#d97706' : '#dc2626'
 
   return `<style>${BASE_CSS}
-    .hero { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:18px; }
-    .hero .box { text-align:center; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px 8px; }
-    .hero .box .v { font-size:18px; font-weight:700; color:#1e293b; }
-    .hero .box .l { font-size:8px; text-transform:uppercase; letter-spacing:0.12em; color:#94a3b8; margin-top:3px; }
+    .hero { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+    .hero .box { text-align:center; background:#f7f8fc; border:1px solid #e0e4f5; border-top:3px solid #6366f1; border-radius:8px; padding:14px 8px; }
+    .hero .box .v { font-family:'Playfair Display', Georgia, serif; font-size:19px; font-weight:600; color:#1e2333; }
+    .hero .box .v.green { color:#047857; }
+    .hero .box .v.red   { color:#b91c1c; }
+    .hero .box .v.amber { color:#b45309; }
+    .hero .box .l { font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.11em; color:#8b8fa3; margin-top:4px; }
     .brrrr-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:8px 0 12px; }
-    .brrrr-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:10px 8px; text-align:center; }
+    .brrrr-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:11px 8px; text-align:center; }
     .brrrr-box.warn { background:#fffbeb; border-color:#fde68a; }
     .brrrr-box.bad { background:#fff1f2; border-color:#fecdd3; }
-    .brrrr-box .bv { font-size:15px; font-weight:700; color:#1e293b; }
-    .brrrr-box .bl { font-size:8px; text-transform:uppercase; letter-spacing:0.1em; color:#94a3b8; margin-top:2px; }
+    .brrrr-box .bv { font-size:15px; font-weight:700; color:#1e2333; }
+    .brrrr-box .bl { font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:#8b8fa3; margin-top:3px; }
   </style>
 
-<div class="header">
-  <div class="brand">ClearPath Analyzer &nbsp;·&nbsp; Deal Sheet</div>
-  <h1>${esc(address)}</h1>
-  <div class="meta">${today} &nbsp;·&nbsp; ${condLabel} Condition &nbsp;·&nbsp; ${arvNote}</div>
-</div>
+${buildLetterhead('Deal Sheet', address, [today, `${condLabel} Condition`, arvNote])}
 
 <div class="hero">
   <div class="box"><div class="v">${fmt(results.arv)}</div><div class="l">After Repair Value</div></div>
@@ -324,7 +462,7 @@ ${sec.scenarios && alternatives && alternatives.length > 0 ? `
       <td>${fmt(a.rehabMidpoint as number)}</td>
       <td class="${(a.flipSignal as string) === 'green' ? 'green' : (a.flipSignal as string) === 'red' ? 'red' : 'amber'}">${(a.flipProfit as number) >= 0 ? '+' : ''}${fmt(a.flipProfit as number)}</td>
       <td class="${(a.rentalSignal as string) === 'green' ? 'green' : (a.rentalSignal as string) === 'red' ? 'red' : 'amber'}">${(a.monthlyCashFlow as number) >= 0 ? '+' : ''}${fmt(a.monthlyCashFlow as number)}/mo</td>
-      <td>${signal(a.flipSignal as string, '')} ${signal(a.rentalSignal as string, '')}</td>
+      <td>${dot(a.flipSignal as string)} ${dot(a.rentalSignal as string)}</td>
     </tr>`
   }).join('')}
 </table>` : ''}
@@ -360,9 +498,107 @@ ${sec.str && str ? (() => {
 </div>`
 })() : ''}
 
+${FOOTER_HTML}`
+}
+
+// ── OFFER LETTER (LOI) ─────────────────────────────────────────────────────────
+function buildOfferLetter(body: Record<string, unknown>): string {
+  const {
+    address, results, customRehab,
+    buyerName, offerPrice, earnestMoney, closingDays, expirationDays, inspectionDays,
+  } = body as {
+    address: string
+    results: Record<string, number & string>
+    customRehab: number
+    buyerName: string
+    offerPrice: number
+    earnestMoney: number
+    closingDays: number
+    expirationDays: number
+    inspectionDays: number
+  }
+
+  const rehab = customRehab ?? results.rehabEstimate
+  const mao = Math.round(results.arv * 0.7 - rehab)
+  const price = offerPrice && offerPrice > 0 ? Math.round(offerPrice) : mao
+  const earnest = earnestMoney && earnestMoney > 0 ? Math.round(earnestMoney) : 1000
+  const closing = closingDays && closingDays > 0 ? Math.round(closingDays) : 21
+  const inspection = inspectionDays && inspectionDays > 0 ? Math.round(inspectionDays) : 5
+  const expiration = expirationDays && expirationDays > 0 ? Math.round(expirationDays) : 3
+  const buyer = (buyerName ?? '').trim() || 'Buyer'
+
+  const today = new Date()
+  const todayLabel = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  const expiresDate = new Date(today.getTime() + expiration * 24 * 60 * 60 * 1000)
+  const expiresLabel = expiresDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  const closingDate = new Date(today.getTime() + closing * 24 * 60 * 60 * 1000)
+  const closingLabel = closingDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
+  return `<style>${BASE_CSS}
+    .letter-body { padding-top: 4px; }
+    .letter-body p { margin-bottom: 13px; }
+    .letter-dateline { font-size: 10px; color: #6b7280; text-align: right; margin-bottom: 18px; }
+    .letter-re {
+      font-size: 10px; margin-bottom: 18px; padding: 10px 14px;
+      background: #f7f8fc; border-left: 3px solid #6366f1; border-radius: 0 6px 6px 0;
+    }
+    .letter-re .label { font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 8px; color: #4338ca; margin-right: 6px; }
+    .terms-table { margin: 16px 0; }
+    .terms-table tr.price-row td {
+      background: #f5f6fe; font-weight: 700; font-size: 12px;
+      border-top: 1.5px solid #dbdefb; border-bottom: 1.5px solid #dbdefb;
+    }
+    .terms-table tr.price-row td:first-child { color: #1e2333; }
+    .terms-table tr.price-row td:last-child { color: #4338ca; font-family: 'Playfair Display', Georgia, serif; font-size: 15px; }
+    .closing { margin-top: 22px; }
+    .sign-grid { display:grid; grid-template-columns:1fr 1fr; gap:32px; margin-top:20px; }
+    .sign-line { border-top:1px solid #cbd0e0; margin-top:40px; padding-top:7px; font-size:9px; color:#6b7280; }
+    .sign-line .who { display: block; font-weight: 600; color: #374151; font-size: 9.5px; margin-bottom: 1px; }
+  </style>
+
+${buildLetterhead('Purchase Offer / Letter of Intent', address, [`Offer expires ${expiresLabel}`, `${inspection}-day inspection`, 'Cash, as-is'])}
+
+<div class="letter-body">
+<div class="letter-dateline">${esc(todayLabel)}</div>
+
+<div class="letter-re"><span class="label">Re</span>Purchase Offer for ${esc(address)}</div>
+
+<p>To the Owner of Record of the property located at <strong>${esc(address)}</strong> (the "Property"):</p>
+
+<p>${esc(buyer)} ("Buyer") is pleased to submit the following offer to purchase the Property on an as-is, cash basis, subject to the terms below.</p>
+
+<table class="terms-table">
+  <tr class="price-row"><td>Purchase Price</td><td>${fmt(price)}</td></tr>
+  <tr><td>Earnest Money Deposit</td><td>${fmt(earnest)}, due within 3 business days of acceptance</td></tr>
+  <tr><td>Purchase Terms</td><td>Cash — no financing contingency</td></tr>
+  <tr><td>Property Condition</td><td>As-is; Buyer to make no repair requests of Seller</td></tr>
+  <tr><td>Inspection Period</td><td>${inspection} calendar days from acceptance</td></tr>
+  <tr><td>Target Closing Date</td><td>On or before ${esc(closingLabel)} (${closing} days from acceptance)</td></tr>
+  <tr><td>Closing Costs</td><td>Buyer and Seller to each pay their customary closing costs</td></tr>
+  <tr><td>Offer Expires</td><td>${esc(expiresLabel)}, unless accepted or extended in writing</td></tr>
+</table>
+
+<p>This offer is submitted for the Seller's consideration and does not constitute a binding contract until a formal purchase and sale agreement is signed by both parties. Buyer is prepared to provide proof of funds upon request and to move promptly to a signed agreement.</p>
+
+<p>If these terms are acceptable, please sign below or contact Buyer directly to discuss. Buyer looks forward to the opportunity to work with you.</p>
+
+<div class="closing no-break">
+<p style="margin-bottom: 30px;">Sincerely,</p>
+
+<div class="sign-grid">
+  <div>
+    <div class="sign-line"><span class="who">${esc(buyer)}</span>Buyer &nbsp;&nbsp;·&nbsp;&nbsp; Date</div>
+  </div>
+  <div>
+    <div class="sign-line"><span class="who">&nbsp;</span>Seller / Owner of Record &nbsp;&nbsp;·&nbsp;&nbsp; Date</div>
+  </div>
+</div>
+</div>
+</div>
+
 <div class="footer">
-  <span>Generated by ClearPath Analyzer &nbsp;·&nbsp; clearpathassetgroup.com</span>
-  <span>Estimates are for educational purposes only. Not financial advice.</span>
+  <span class="footer-brand"><span class="mark"></span>Generated by ClearPath Analyzer &nbsp;·&nbsp; clearpathassetgroup.com</span>
+  <span>This is not a binding contract. Consult a real estate attorney before executing a purchase agreement.</span>
 </div>`
 }
 
@@ -422,18 +658,14 @@ function buildFullReport(body: Record<string, unknown>): string {
       <td>${fmt(a.rehabMidpoint as number)}</td>
       <td class="${(a.flipSignal as string) === 'green' ? 'green' : (a.flipSignal as string) === 'red' ? 'red' : 'amber'}">${(a.flipProfit as number) >= 0 ? '+' : ''}${fmt(a.flipProfit as number)}</td>
       <td class="${(a.rentalSignal as string) === 'green' ? 'green' : (a.rentalSignal as string) === 'red' ? 'red' : 'amber'}">${(a.monthlyCashFlow as number) >= 0 ? '+' : ''}${fmt(a.monthlyCashFlow as number)}/mo</td>
-      <td>${signal(a.flipSignal as string, '')} ${signal(a.rentalSignal as string, '')}</td>
+      <td>${dot(a.flipSignal as string)} ${dot(a.rentalSignal as string)}</td>
     </tr>`
   }).join('')}
 </table>` : ''
 
   return `<style>${BASE_CSS}</style>
 
-<div class="header">
-  <div class="brand">ClearPath Analyzer &nbsp;·&nbsp; Full Deal Report</div>
-  <h1>${esc(address)}</h1>
-  <div class="meta">${today} &nbsp;·&nbsp; ${condLabel} Condition &nbsp;·&nbsp; ${arvNote}</div>
-</div>
+${buildLetterhead('Full Deal Report', address, [today, `${condLabel} Condition`, arvNote])}
 
 <div class="two-col">
   <div class="summary-box">
@@ -533,10 +765,7 @@ ${(() => {
 </div>`
 })()}
 
-<div class="footer">
-  <span>Generated by ClearPath Analyzer &nbsp;·&nbsp; clearpathassetgroup.com</span>
-  <span>Estimates for educational purposes only. Not financial advice.</span>
-</div>`
+${FOOTER_HTML}`
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -550,13 +779,22 @@ export async function POST(req: NextRequest) {
     address,
     reportType = 'deal_sheet',
     mode = 'preview',
-  } = body as { address: string; reportType: 'deal_sheet' | 'full_report'; mode: 'preview' | 'print' }
+  } = body as { address: string; reportType: 'deal_sheet' | 'full_report' | 'offer_letter'; mode: 'preview' | 'print' }
 
   if (!address) return NextResponse.json({ error: 'address required' }, { status: 400 })
 
-  const innerHtml = reportType === 'full_report' ? buildFullReport(body) : buildDealSheet(body)
-  const title = `${reportType === 'full_report' ? 'ClearPath Full Report' : 'ClearPath Deal Sheet'} — ${esc(address)}`
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body>${innerHtml}</body></html>`
+  const innerHtml = reportType === 'full_report' ? buildFullReport(body)
+    : reportType === 'offer_letter' ? buildOfferLetter(body)
+    : buildDealSheet(body)
+  const reportLabel = reportType === 'full_report' ? 'ClearPath Full Report'
+    : reportType === 'offer_letter' ? 'ClearPath Offer Letter'
+    : 'ClearPath Deal Sheet'
+  const title = `${reportLabel} — ${esc(address)}`
+  // Real fonts (loaded by headless Chrome at PDF-render time, or the browser tab in preview
+  // mode) so the exported document matches the app's own Playfair/Inter brand typography
+  // instead of falling back to system fonts.
+  const fontLink = '<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">'
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>${fontLink}</head><body>${innerHtml}</body></html>`
 
   // Preview mode: return HTML for in-browser view
   if (mode === 'preview') {
@@ -598,6 +836,8 @@ export async function POST(req: NextRequest) {
     const fileSlug = address.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60)
     const filename = reportType === 'full_report'
       ? `ClearPath-Full-Report-${fileSlug}.pdf`
+      : reportType === 'offer_letter'
+      ? `ClearPath-Offer-Letter-${fileSlug}.pdf`
       : `ClearPath-Deal-Sheet-${fileSlug}.pdf`
 
     return new NextResponse(Buffer.from(pdfBuffer), {
