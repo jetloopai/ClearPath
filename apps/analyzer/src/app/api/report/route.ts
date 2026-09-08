@@ -69,17 +69,37 @@ const BASE_CSS = `
   /* Prevent blank trailing page */
   body > *:last-child { margin-bottom: 0 !important; page-break-after: avoid; }
 
-  /* ── Cover hero ── */
+  /* ── Cover hero: dark, oversized type, decorative shapes, labeled meta strip ── */
   .header {
-    background: #ffffff;
-    color: #1e2333;
-    padding: 40px 44px 28px;
-    margin-bottom: 26px;
-    border-bottom: 3px solid #1e1b4b;
+    position: relative;
+    overflow: hidden;
+    background: #100e2e;
+    color: white;
+    padding: 34px 40px 0;
+    margin-bottom: 28px;
     page-break-after: avoid;
   }
 
+  .header .deco-circle {
+    position: absolute;
+    top: -70px; right: -60px;
+    width: 210px; height: 210px;
+    border-radius: 50%;
+    background: #4f46e5;
+    opacity: 0.9;
+  }
+
+  .header .deco-ring {
+    position: absolute;
+    bottom: -90px; right: 40px;
+    width: 150px; height: 150px;
+    border-radius: 50%;
+    border: 22px solid #bef264;
+    opacity: 0.9;
+  }
+
   .header .brandrow {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -93,57 +113,72 @@ const BASE_CSS = `
     font-size: 12px;
     font-weight: 800;
     letter-spacing: -0.01em;
-    color: #1e1b4b;
+    color: #ffffff;
   }
 
   .header .brand .mark {
     width: 20px;
     height: 20px;
     border-radius: 6px;
-    background: #1e1b4b;
+    background: #bef264;
     display: inline-block;
   }
 
   .header .doctype {
     font-size: 9px;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: #4338ca;
-    background: #eef0fe;
+    color: #100e2e;
+    background: #bef264;
     border-radius: 100px;
     padding: 5px 13px;
   }
 
   .header .eyebrow {
-    font-size: 10px;
-    font-weight: 700;
+    position: relative;
+    font-size: 10.5px;
+    font-weight: 800;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #9ca0b3;
-    margin-bottom: 10px;
+    color: #bef264;
+    margin-bottom: 12px;
   }
 
   .header h1 {
+    position: relative;
     font-family: 'Inter', sans-serif;
-    font-size: 28px;
+    font-size: 34px;
     font-weight: 800;
-    color: #1e2333;
-    margin-bottom: 10px;
+    color: #ffffff;
+    margin-bottom: 22px;
     letter-spacing: -0.02em;
-    line-height: 1.15;
+    line-height: 1.08;
+    max-width: 76%;
   }
 
-  .header .meta {
-    font-size: 11px;
-    font-weight: 500;
-    color: #6b7280;
+  .header .metastrip {
+    position: relative;
     display: flex;
-    align-items: center;
-    gap: 9px;
+    gap: 36px;
+    padding: 18px 0 22px;
+    border-top: 1px solid rgba(255, 255, 255, 0.14);
   }
 
-  .header .meta .sep { color: #c7cbe8; }
+  .header .metastrip .col .lbl {
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #a5acc9;
+    margin-bottom: 4px;
+  }
+
+  .header .metastrip .col .val {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #ffffff;
+  }
 
   body { padding: 0 32px 32px; }
 
@@ -227,7 +262,7 @@ const BASE_CSS = `
     border-radius: 100px;
     white-space: nowrap;
   }
-  .badge-green { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+  .badge-green { background: #100e2e; color: #bef264; border: 1px solid #100e2e; }
   .badge-amber { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
   .badge-red   { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
 
@@ -303,16 +338,20 @@ const BASE_CSS = `
 `
 
 // Shared cover-hero markup for all report types — keeps branding consistent.
-function buildLetterhead(docType: string, address: string, metaParts: string[]): string {
-  const meta = metaParts.filter(Boolean).map(esc).join('<span class="sep">&bull;</span>')
+function buildLetterhead(docType: string, address: string, columns: { label: string; value: string }[]): string {
+  const metastrip = columns.filter(c => c.value).map(c =>
+    `<div class="col"><div class="lbl">${esc(c.label)}</div><div class="val">${esc(c.value)}</div></div>`
+  ).join('')
   return `<div class="header">
+  <div class="deco-circle"></div>
+  <div class="deco-ring"></div>
   <div class="brandrow">
     <div class="brand"><span class="mark"></span>ClearPath Analyzer</div>
     <div class="doctype">${esc(docType)}</div>
   </div>
   <div class="eyebrow">Prepared for</div>
   <h1>${esc(address)}</h1>
-  <div class="meta">${meta}</div>
+  <div class="metastrip">${metastrip}</div>
 </div>`
 }
 
@@ -366,7 +405,11 @@ function buildDealSheet(body: Record<string, unknown>): string {
     .brrrr-box .bl { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#9ca0b3; margin-top:4px; }
   </style>
 
-${buildLetterhead('Deal Sheet', address, [today, `${condLabel} Condition`, arvNote])}
+${buildLetterhead('Deal Sheet', address, [
+  { label: 'Prepared', value: today },
+  { label: 'Condition', value: `${condLabel}` },
+  { label: 'ARV basis', value: arvNote },
+])}
 
 <div class="hero">
   <div class="box"><div class="v">${fmt(results.arv)}</div><div class="l">After Repair Value</div></div>
@@ -566,7 +609,11 @@ function buildOfferLetter(body: Record<string, unknown>): string {
     .sign-line .who { display: block; font-weight: 700; color: #1e2333; font-size: 10px; margin-bottom: 1px; }
   </style>
 
-${buildLetterhead('Purchase Offer / Letter of Intent', address, [`Offer expires ${expiresLabel}`, `${inspection}-day inspection`, 'Cash, as-is'])}
+${buildLetterhead('Purchase Offer / Letter of Intent', address, [
+  { label: 'Offer expires', value: expiresLabel },
+  { label: 'Inspection', value: `${inspection} days` },
+  { label: 'Terms', value: 'Cash, as-is' },
+])}
 
 <div class="letter-body">
 <div class="letter-dateline">${esc(todayLabel)}</div>
@@ -677,7 +724,11 @@ function buildFullReport(body: Record<string, unknown>): string {
 
   return `<style>${BASE_CSS}</style>
 
-${buildLetterhead('Full Deal Report', address, [today, `${condLabel} Condition`, arvNote])}
+${buildLetterhead('Full Deal Report', address, [
+  { label: 'Prepared', value: today },
+  { label: 'Condition', value: `${condLabel}` },
+  { label: 'ARV basis', value: arvNote },
+])}
 
 <div class="two-col">
   <div class="summary-box">
