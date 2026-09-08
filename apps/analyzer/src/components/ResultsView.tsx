@@ -17,6 +17,7 @@ import { trackEvent } from "@/lib/analytics";
 import { AuthModal } from "@/components/AuthModal";
 import { supabase } from "@/lib/supabase-browser";
 import { ImageUploadZone } from "@/components/ImageUploadZone";
+import { PhotoAnnotations } from "@/components/PhotoAnnotations";
 
 type ViewState = "loading" | "gated" | "unlocked";
 
@@ -62,6 +63,7 @@ interface StoredAnalysis {
     label: string;
     summary: string;
   };
+  uploadedImages?: string[];
 }
 
 const fmt = (val: number) =>
@@ -155,7 +157,11 @@ export default function ResultsView() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [leadError, setLeadError] = useState("");
-  const [downloading, setDownloading] = useState<"deal_sheet" | "full_report" | null>(null);
+  const [downloading, setDownloading] = useState<"deal_sheet" | "full_report" | "offer_letter" | null>(null);
+  const [offerBuyerName, setOfferBuyerName] = useState("");
+  const [offerPriceOverride, setOfferPriceOverride] = useState<number | null>(null);
+  const [offerEarnestMoney, setOfferEarnestMoney] = useState(1000);
+  const [offerClosingDays, setOfferClosingDays] = useState(21);
   const [copied, setCopied] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<string>("Hard Money");
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -345,9 +351,14 @@ export default function ResultsView() {
     flipCountRef.current.val = data.results.flipProfit;
     maoCountRef.current.val = data.results.mao;
 
-    // Init image analysis if it came from ConfigModal
+    // Init image analysis if it came from ConfigModal — seed refineImages with the
+    // original intake photos so PhotoAnnotations can render pins on first load, not
+    // only after the user re-uploads via the refine panel.
     if ((data as any).imageAnalysis) {
       setImageAnalysis((data as any).imageAnalysis);
+      if (data.uploadedImages && data.uploadedImages.length > 0) {
+        setRefineImages(data.uploadedImages);
+      }
     }
 
     // fromDashboard: user already verified by dashboard — skip gate immediately
@@ -477,7 +488,7 @@ export default function ResultsView() {
   };
 
   // ── Rehab editor helpers ──────────────────────────────────────────────────────
-  const reportPayload = (reportType: "deal_sheet" | "full_report") => ({
+  const reportPayload = (reportType: "deal_sheet" | "full_report" | "offer_letter") => ({
     reportType,
     address: analysis!.address,
     price: analysis!.price,
@@ -495,6 +506,11 @@ export default function ResultsView() {
     rentExplainer: analysis!.rentExplainer,
     subjectData: analysis!.subjectData,
     customRehab,
+    // Offer letter fields (ignored by deal_sheet / full_report)
+    buyerName: offerBuyerName,
+    offerPrice: offerPriceOverride ?? analysis!.results.mao,
+    earnestMoney: offerEarnestMoney,
+    closingDays: offerClosingDays,
     // BRRRR values for report
     brrrr: {
       refiLTV,
@@ -528,7 +544,7 @@ export default function ResultsView() {
     sections: dealSheetSections,
   });
 
-  const openReport = async (reportType: "deal_sheet" | "full_report", mode: "preview" | "print") => {
+  const openReport = async (reportType: "deal_sheet" | "full_report" | "offer_letter", mode: "preview" | "print") => {
     if (!analysis || downloading) return;
     setDownloading(reportType);
     try {
@@ -550,7 +566,7 @@ export default function ResultsView() {
     }
   };
 
-  const downloadPDF = async (reportType: "deal_sheet" | "full_report") => {
+  const downloadPDF = async (reportType: "deal_sheet" | "full_report" | "offer_letter") => {
     if (!analysis || downloading) return;
     setDownloading(reportType);
     try {
@@ -569,7 +585,8 @@ export default function ResultsView() {
         const a = document.createElement("a");
         const slug = analysis.address.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
         a.href = url;
-        a.download = `${reportType === "full_report" ? "ClearPath-Full-Report" : "ClearPath-Deal-Sheet"}-${slug}.pdf`;
+        const reportFileLabel = reportType === "full_report" ? "ClearPath-Full-Report" : reportType === "offer_letter" ? "ClearPath-Offer-Letter" : "ClearPath-Deal-Sheet";
+        a.download = `${reportFileLabel}-${slug}.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -1397,6 +1414,10 @@ export default function ResultsView() {
 
               {activeImageAnalysis ? (
                 <div className="space-y-4">
+                  {activeImageAnalysis && refineImages.length > 0 && activeImageAnalysis.scopeOfWork.length > 0 && (
+                    <PhotoAnnotations images={refineImages} scopeOfWork={activeImageAnalysis.scopeOfWork} />
+                  )}
+
                   <p className="text-sm text-zinc-400 leading-relaxed">{activeImageAnalysis.summary}</p>
 
                   {activeImageAnalysis.scopeOfWork.length > 0 && (
@@ -2469,6 +2490,86 @@ export default function ResultsView() {
                   >
                     <Download className="w-3 h-3" />
                     {downloading === "full_report" ? "Building PDF…" : "Download PDF"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Offer Letter */}
+              <div className="border border-white/[0.07] bg-white/[0.02] rounded-2xl p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
+                    <Download className="w-4 h-4 text-zinc-400" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-zinc-200">Offer Letter</div>
+                    <div className="text-xs text-zinc-500">Cash offer / LOI, defaults to MAO</div>
+                  </div>
+                </div>
+                <div className="space-y-2 mb-3">
+                  <div>
+                    <label className="block text-[10px] text-zinc-500 mb-1">Buyer / entity name (required)</label>
+                    <input
+                      type="text"
+                      value={offerBuyerName}
+                      onChange={(e) => setOfferBuyerName(e.target.value)}
+                      placeholder="e.g. Jane Smith or Smith Properties LLC"
+                      className={`w-full px-3 py-2 rounded-lg bg-white/[0.03] border text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none transition-colors ${
+                        offerBuyerName.trim() ? "border-white/[0.07] focus:border-indigo-500/40" : "border-amber-500/30 focus:border-amber-500/50"
+                      }`}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-1">Offer price</label>
+                      <input
+                        type="number"
+                        value={offerPriceOverride ?? analysis!.results.mao}
+                        onChange={(e) => setOfferPriceOverride(Number(e.target.value) || null)}
+                        className="w-full px-2 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.07] text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-1">Earnest $</label>
+                      <input
+                        type="number"
+                        value={offerEarnestMoney}
+                        onChange={(e) => setOfferEarnestMoney(Number(e.target.value) || 0)}
+                        className="w-full px-2 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.07] text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-zinc-500 mb-1">Closing (days)</label>
+                      <input
+                        type="number"
+                        value={offerClosingDays}
+                        onChange={(e) => setOfferClosingDays(Number(e.target.value) || 21)}
+                        className="w-full px-2 py-1.5 rounded-lg bg-white/[0.03] border border-white/[0.07] text-xs text-zinc-200 focus:outline-none focus:border-indigo-500/40"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-zinc-600 leading-relaxed">
+                    {offerPriceOverride === null
+                      ? <>Offer price defaults to your Max Allowable Offer of <span className="text-zinc-400">{fmt(analysis!.results.mao)}</span> — edit above to override.</>
+                      : <>Offer price set to <span className="text-zinc-400">{fmt(offerPriceOverride)}</span> (MAO is {fmt(analysis!.results.mao)}).</>}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openReport("offer_letter", "preview")}
+                    disabled={downloading !== null || !offerBuyerName.trim()}
+                    title={!offerBuyerName.trim() ? "Enter a buyer name first" : undefined}
+                    className="flex-1 py-2 rounded-xl border border-white/[0.07] text-xs text-zinc-400 hover:bg-white/[0.04] transition-all disabled:opacity-40"
+                  >
+                    {downloading === "offer_letter" ? "…" : "Preview"}
+                  </button>
+                  <button
+                    onClick={() => downloadPDF("offer_letter")}
+                    disabled={downloading !== null || !offerBuyerName.trim()}
+                    title={!offerBuyerName.trim() ? "Enter a buyer name first" : undefined}
+                    className="flex-1 py-2 rounded-xl bg-white/[0.05] border border-white/[0.09] text-xs text-zinc-300 hover:bg-white/[0.08] transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+                  >
+                    <Download className="w-3 h-3" />
+                    {downloading === "offer_letter" ? "Building PDF…" : "Download PDF"}
                   </button>
                 </div>
               </div>

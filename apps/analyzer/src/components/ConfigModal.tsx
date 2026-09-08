@@ -207,7 +207,7 @@ export function ConfigModal({ address, county, onClose }: ConfigModalProps) {
       }
 
       const data = await res.json();
-      sessionStorage.setItem("clearpath_analysis", JSON.stringify({
+      const storedAnalysis = {
         address: editAddress,
         price: numPrice,
         condition,
@@ -237,7 +237,16 @@ export function ConfigModal({ address, county, onClose }: ConfigModalProps) {
         subjectLat: data.subjectLat ?? null,
         subjectLng: data.subjectLng ?? null,
         imageAnalysis: imageAnalysis ?? undefined,
-      }));
+      };
+
+      try {
+        // Include the original photos so the results page can render on-photo repair
+        // callouts. Photos are base64 and can be large, so this can exceed sessionStorage's
+        // quota (~5-10MB) — fall back to storing without them rather than blocking navigation.
+        sessionStorage.setItem("clearpath_analysis", JSON.stringify({ ...storedAnalysis, uploadedImages }));
+      } catch {
+        sessionStorage.setItem("clearpath_analysis", JSON.stringify(storedAnalysis));
+      }
 
       window.location.href = "/results";
     } catch (err) {

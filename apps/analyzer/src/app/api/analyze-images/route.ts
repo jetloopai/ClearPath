@@ -8,6 +8,8 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const SYSTEM_PROMPT = `You are a real estate rehab expert assessing property condition from photos.
 Respond ONLY with valid JSON — no markdown, no explanation outside the JSON.
 
+Images are provided in order and labeled "Image 0", "Image 1", etc. in the accompanying text.
+
 Condition tiers:
 - cosmetic: Paint, flooring, fixtures. Move-in ready bones.
 - light: Cosmetic + kitchen/bath refresh, minor repairs.
@@ -21,12 +23,20 @@ Return this exact shape:
   "confidence": "low" | "medium" | "high",
   "summary": "2-3 sentences describing the overall property condition and key findings",
   "scopeOfWork": [
-    { "category": "Kitchen", "issue": "Specific issue observed", "estimatedCost": "$X,000–$X,000" }
+    {
+      "category": "Kitchen",
+      "issue": "Specific issue observed",
+      "estimatedCost": "$X,000–$X,000",
+      "imageIndex": 0,
+      "region": { "x": 50, "y": 30 }
+    }
   ]
 }
 
 confidence is "high" if interior photos clearly show condition, "medium" if only exterior or partial views, "low" if photos are unclear or very limited.
-Only include scopeOfWork items for issues actually visible in the photos. Omit categories that look fine.`
+Only include scopeOfWork items for issues actually visible in the photos. Omit categories that look fine.
+
+For each scopeOfWork item, "imageIndex" is the 0-based index of the image (from the labels "Image 0", "Image 1", ...) where that issue is visible, and "region" is your best estimate of where the issue is centered in that image, as a percentage of image width ("x") and height ("y"), each 0-100 (0,0 is top-left). Give your best visual estimate even if approximate — do not omit these fields.`
 
 export async function POST(req: NextRequest) {
   const ip = getIp(req)
@@ -48,26 +58,29 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Build image content blocks — strip data URL prefix
-    const imageBlocks: Anthropic.ImageBlockParam[] = images.map((dataUrl: string) => {
-      const match = dataUrl.match(/^data:(image\/[a-z]+);base64,(.+)$/)
-      if (!match) throw new Error('Invalid image format')
-      const mediaType = match[1] as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
-      return {
-        type: 'image',
-        source: { type: 'base64', media_type: mediaType, data: match[2] },
+    // Build labeled image content blocks — a text label before each image so the model
+    // can reliably reference "imageIndex" in its response, interleaved with the image itself.
+    const labeledContent: (Anthropic.ImageBlockParam | Anthropic.TextBlockParam)[] = images.flatMap(
+      (dataUrl: string, i: number) => {
+        const match = dataUrl.match(/^data:(image\/[a-z]+);base64,(.+)$/)
+        if (!match) throw new Error('Invalid image format')
+        const mediaType = match[1] as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+        return [
+          { type: 'text' as const, text: `Image ${i}:` },
+          { type: 'image' as const, source: { type: 'base64' as const, media_type: mediaType, data: match[2] } },
+        ]
       }
-    })
+    )
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
+      max_tokens: 1536,
       system: SYSTEM_PROMPT,
       messages: [
         {
           role: 'user',
           content: [
-            ...imageBlocks,
+            ...labeledContent,
             { type: 'text', text: `Assess these ${images.length} property photo(s) and return the JSON.` },
           ],
         },
